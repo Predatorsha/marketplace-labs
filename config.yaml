@@ -1,0 +1,7 @@
+output:
+  market_root: "K:/marketplace-labs/data"
+  catalog_db: "K:/marketplace-labs/data/catalog.sqlite"
+  folder_pattern: "{date} {short}"
+
+browser:
+  market_profile_dir: "K:/marketplace-labs/.browser-profile"

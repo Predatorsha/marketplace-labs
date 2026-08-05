@@ -1,0 +1,58 @@
+<svg width="121" height="158" viewBox="0 0 121 158" fill="none" xmlns="http://www.w3.org/2000/svg">
+<style>
+  :root {
+    --border-accent: #FA7199;
+    --border-soft: #FFD9E4;
+    --border-frame: #FDBECF;
+  }
+</style>
+<path d="M13 127H18V132H13V127Z" fill="var(--border-accent)"/>
+<path d="M13 127H18V132H13V127Z" fill="var(--border-accent)"/>
+<path d="M13 138H18V143H13V138Z" fill="var(--border-soft)"/>
+<path d="M13 138H18V143H13V138Z" fill="var(--border-soft)"/>
+<path d="M17 135H22V140H17V135Z" fill="var(--border-soft)"/>
+<path d="M17 135H22V140H17V135Z" fill="var(--border-soft)"/>
+<path d="M102 138H107V143H102V138Z" fill="var(--border-soft)"/>
+<path d="M102 138H107V143H102V138Z" fill="var(--border-soft)"/>
+<path d="M98 135H103V140H98V135Z" fill="var(--border-soft)"/>
+<path d="M98 135H103V140H98V135Z" fill="var(--border-soft)"/>
+<path d="M13 14H18V19H13V14Z" fill="var(--border-soft)"/>
+<path d="M13 14H18V19H13V14Z" fill="var(--border-soft)"/>
+<path d="M17 18H22V23H17V18Z" fill="var(--border-soft)"/>
+<path d="M17 18H22V23H17V18Z" fill="var(--border-soft)"/>
+<path d="M102 14H107V19H102V14Z" fill="var(--border-soft)"/>
+<path d="M102 14H107V19H102V14Z" fill="var(--border-soft)"/>
+<path d="M98 18H103V23H98V18Z" fill="var(--border-soft)"/>
+<path d="M98 18H103V23H98V18Z" fill="var(--border-soft)"/>
+<path d="M13 27H18V32H13V27Z" fill="var(--border-accent)"/>
+<path d="M13 27H18V32H13V27Z" fill="var(--border-accent)"/>
+<path d="M25 15H30V20H25V15Z" fill="var(--border-accent)"/>
+<path d="M25 15H30V20H25V15Z" fill="var(--border-accent)"/>
+<path d="M87 15H92V20H87V15Z" fill="var(--border-accent)"/>
+<path d="M87 15H92V20H87V15Z" fill="var(--border-accent)"/>
+<path d="M102 27H107V32H102V27Z" fill="var(--border-accent)"/>
+<path d="M102 27H107V32H102V27Z" fill="var(--border-accent)"/>
+<path d="M102 127H107V132H102V127Z" fill="var(--border-accent)"/>
+<path d="M102 127H107V132H102V127Z" fill="var(--border-accent)"/>
+<path d="M90 138H95V143H90V138Z" fill="var(--border-accent)"/>
+<path d="M90 138H95V143H90V138Z" fill="var(--border-accent)"/>
+<path d="M25 138H30V143H25V138Z" fill="var(--border-accent)"/>
+<path d="M25 138H30V143H25V138Z" fill="var(--border-accent)"/>
+<path d="M15 153H106V158H15V153Z" fill="var(--border-frame)"/>
+<path d="M15 153H106V158H15V153Z" fill="var(--border-frame)"/>
+<path d="M15 0H106V5H15V0Z" fill="var(--border-frame)"/>
+<path d="M15 0H106V5H15V0Z" fill="var(--border-frame)"/>
+<path d="M116 15H121V143H116V15Z" fill="var(--border-frame)"/>
+<path d="M116 15H121V143H116V15Z" fill="var(--border-frame)"/>
+<path d="M0 15H5V143H0V15Z" fill="var(--border-frame)"/>
+<path d="M0 15H5V143H0V15Z" fill="var(--border-frame)"/>
+<path d="M5 143H10V148H5V143Z" fill="var(--border-frame)"/>
+<path d="M5 143H10V148H5V143Z" fill="var(--border-frame)"/>
+<path d="M10 148H15V153H10V148Z" fill="var(--border-frame)"/>
+<path d="M106 148H111V153H106V148Z" fill="var(--border-frame)"/>
+<path d="M111 143H116V148H111V143Z" fill="var(--border-frame)"/>
+<path d="M5 10H10V15H5V10Z" fill="var(--border-frame)"/>
+<path d="M10 5H15V10H10V5Z" fill="var(--border-frame)"/>
+<path d="M111 10H116V15H111V10Z" fill="var(--border-frame)"/>
+<path d="M106 5H111V10H106V5Z" fill="var(--border-frame)"/>
+</svg>
