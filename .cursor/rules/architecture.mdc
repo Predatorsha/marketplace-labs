@@ -1,0 +1,34 @@
+---
+description: Where to place code — folder map, marketplace split, short files
+alwaysApply: true
+---
+
+# Code placement
+
+When adding or moving files, read [ARCHITECTURE.md](ARCHITECTURE.md) and place code by concern.
+
+## Folders (main)
+
+- `app` — Electron lifecycle / window only
+- `ipc` — thin handlers; no scrape / heavy SQL
+- `browser` + `browser/auth/<platform>.ts` — Playwright, human gate, per-platform login
+- `scrape` — orchestration + URL parse; platform work in `scrape/<platform>/`
+- `db` — schema + model types (not queries)
+- `code` — SQLite read/write
+- `core` — connect, paths, migrate
+- `products` — list/get/update, gallery, on-disk folders
+- `media` — `ml-media://`
+- `jobs` — job logs
+- Shared IPC types → `src/shared/types`
+
+Do not invent a new `src/main/` top-level folder without a real new concern.
+
+## Marketplaces
+
+- After platform is known, branch immediately. Routers (`marketAuth.ts`, `scrape/product.ts`) only dispatch.
+- Temu and AliExpress stay in **separate** folders/files. Duplicate over shared — no shared fetch/parsers for both.
+- Future merge decision: [docs/features-later.md](docs/features-later.md). Do not consolidate platforms early.
+
+## File size
+
+- One step/type per file; soft cap ~200–250 lines. Thin IPC.

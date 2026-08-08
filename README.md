@@ -31,18 +31,24 @@ Paths live in [`config.yaml`](config.yaml):
 
 ## Layout
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for where to put new code (marketplace split, short files, folder map).
+
 - `src/main/app` — Electron entry + window
 - `src/main/ipc` — IPC registration and handlers
 - `src/main/browser` — Playwright browser + login gate
+- `src/main/scrape` — product scrape orchestration; platform code in `scrape/<platform>/`
 - `src/main/media` — `ml-media://` protocol for local product photos
 - `src/main/db` — SQLite schema + models
 - `src/main/code` — DB read/write (products, orders, tags)
 - `src/main/core` — connect, paths, migrate
 - `src/main/products` — list/get/update, gallery, on-disk product files
+- `src/main/jobs` — job / download logging
 - `src/preload` — IPC bridge
 - `src/renderer/src/pages` — Import + Catalog pages
 - `src/renderer/src/components` — shared UI widgets
 - `src/shared/types` — shared TypeScript types
 - `data/` — product folders + catalog DB (created at runtime)
 
-Product download / order scrape are not included yet (Import download returns a stub).
+Agent backlogs: [docs/bugs-to-fix.md](docs/bugs-to-fix.md), [docs/features-later.md](docs/features-later.md).
+
+Temu product scrape is implemented; AliExpress scrape and order scrape are still TBD.
