@@ -1,19 +1,41 @@
 import type { Page } from 'playwright'
+import type { PlatformId } from './humanGate'
+import { ensureAliExpressLoggedIn } from './auth/aliexpress'
+import { ensureTemuLoggedIn } from './auth/temu'
+import type { AuthGateOpts, AuthProgressFn } from './auth/util'
 
-export type ProgressFn = (data: Record<string, unknown>) => void
+export type ProgressFn = AuthProgressFn
+
+function platformFromUrl(pageUrl: string): PlatformId | null {
+  const host = pageUrl.toLowerCase()
+  if (host.includes('temu')) return 'temu'
+  if (host.includes('aliexpress') || host.includes('aliyun')) return 'aliexpress'
+  return null
+}
 
 /**
- * Placeholder for marketplace login checks.
- * Full AE login / human-gate flow lives with scrape code (not moved yet).
+ * Route to the platform-specific login / captcha workflow.
+ * Temu and AliExpress logic live in separate modules — do not mix them here.
  */
 export async function ensurePlatformLoggedIn(
-  _page: Page,
-  _opts?: { progress?: ProgressFn; timeoutMs?: number }
+  page: Page,
+  opts?: AuthGateOpts & { platform?: PlatformId }
 ): Promise<void> {
-  /* no-op until scrape / auth helpers are moved */
+  const platform = opts?.platform || platformFromUrl(page.url())
+  if (platform === 'temu') {
+    await ensureTemuLoggedIn(page, opts)
+    return
+  }
+  if (platform === 'aliexpress') {
+    await ensureAliExpressLoggedIn(page, opts)
+    return
+  }
 }
 
-/** No-op marker for pages; auth is explicit when scrape returns. */
+/** No-op marker for pages; auth is explicit via ensurePlatformLoggedIn / ensureTemuLoggedIn. */
 export function installMarketAuthGuard(_page: Page): void {
-  /* intentionally empty — see ensurePlatformLoggedIn */
+  /* intentionally empty — see ensureTemuLoggedIn / ensureAliExpressLoggedIn */
 }
+
+export { ensureTemuLoggedIn } from './auth/temu'
+export { ensureAliExpressLoggedIn } from './auth/aliexpress'

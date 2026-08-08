@@ -1,10 +1,11 @@
 import type { AppConfig } from '../config'
-import { connect, fromRelativeFolder } from '../catalog/db'
 import {
   getProductChoicePrices,
   getProductImages,
   joinChoicePrices
-} from '../catalog/repos/products'
+} from '../code/products'
+import { connect } from '../core/connect'
+import { fromRelativeFolder } from '../core/paths'
 import { toMediaUrl } from '../media/protocol'
 import type {
   CatalogListItem,

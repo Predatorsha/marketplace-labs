@@ -34,12 +34,11 @@ function titleFor(kind: HumanGateKind): string {
 }
 
 function bodyFor(payload: HumanGatePayload): string {
-  const site = payload.platform === 'temu' ? 'Temu' : 'AliExpress'
+  // Platform-specific copy is owned by browser/auth/temu.ts and aliexpress.ts.
   if (payload.message) return payload.message
-  if (payload.kind === 'login') {
-    return `${site}: войдите в аккаунт, затем нажмите «Продолжить» или кликните это уведомление.`
-  }
-  return `${site}: пройдите проверку, затем нажмите «Продолжить» или кликните это уведомление.`
+  return payload.kind === 'login'
+    ? 'Войдите в аккаунт, затем нажмите «Продолжить» или кликните это уведомление.'
+    : 'Пройдите проверку, затем нажмите «Продолжить» или кликните это уведомление.'
 }
 
 function showWindowsNotification(payload: HumanGatePayload, gateId: number): Notification | null {

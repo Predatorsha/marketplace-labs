@@ -1,0 +1,105 @@
+import type { Page } from 'playwright'
+import { ensureTemuLoggedIn } from '../../browser/auth/temu'
+import { normalizeDisplayPrice } from '../price'
+import type { ScrapedProduct } from '../product'
+import { expandTemuProductDetails } from './details'
+import { extractTemuDom } from './extract'
+import { imageDedupeKey, upgradeTemuImageUrl } from './images'
+import { resolveTemuSellerStore } from './seller'
+import { sleep } from './util'
+
+export { upgradeTemuImageUrl } from './images'
+
+function resolveGoodsId(pageUrl: string, fallback: string): string {
+  try {
+    const finalUrl = new URL(pageUrl)
+    const gid = finalUrl.searchParams.get('goods_id') || finalUrl.searchParams.get('goodsId')
+    if (gid && /^\d+$/.test(gid)) return gid
+  } catch {
+    /* keep fallback */
+  }
+  return fallback
+}
+
+/**
+ * Scrape a Temu product page (single-choice / no variant picker case).
+ * Navigates, waits for login gate if needed, extracts fields from the first screen.
+ */
+export async function scrapeTemuProductPage(
+  page: Page,
+  opts: { url: string; productId: string }
+): Promise<ScrapedProduct> {
+  await page.goto(opts.url, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+  await sleep(1500)
+
+  await ensureTemuLoggedIn(page)
+
+  const cur = page.url()
+  if (!/goods|product|\d{6,}/i.test(cur) || cur.includes('about:blank')) {
+    await page.goto(opts.url, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+    await sleep(1000)
+  }
+
+  await page
+    .waitForFunction(
+      () =>
+        /Est\.?/i.test(document.body?.innerText || '') || document.querySelectorAll('img').length > 5,
+      { timeout: 45_000 }
+    )
+    .catch(() => undefined)
+
+  await expandTemuProductDetails(page)
+
+  const dom = await extractTemuDom(page)
+  const gallery = (dom.gallery || [])
+    .map((u) => upgradeTemuImageUrl(u))
+    .filter((u) => /^https?:\/\//i.test(u))
+  if (gallery.length < 1) {
+    throw new Error('temu: no gallery images found on product page')
+  }
+
+  const price = normalizeDisplayPrice(dom.priceRaw)
+  if (!price) {
+    throw new Error(`temu: could not parse Est. price (raw=${dom.priceRaw ?? 'null'})`)
+  }
+
+  const text = (dom.title || '').trim()
+  if (!text) {
+    throw new Error('temu: product title/description not found')
+  }
+
+  // Single-choice: last saved frame → Choice; the rest → images/.
+  // Drop Choice URL from images when the gallery also contained it.
+  const choiceUrl = gallery[gallery.length - 1]
+  const choiceKey = imageDedupeKey(choiceUrl)
+  const imageUrls = gallery
+    .slice(0, -1)
+    .filter((u) => imageDedupeKey(u) !== choiceKey)
+
+  const productId = resolveGoodsId(page.url(), opts.productId)
+  const specs =
+    dom.specs && Object.keys(dom.specs).length > 0 ? { ...dom.specs } : undefined
+
+  const productPageUrl = page.url() || opts.url
+  const sellerStore = await resolveTemuSellerStore(page)
+
+  return {
+    product_id: productId,
+    url: productPageUrl,
+    title: text,
+    description: text,
+    rating: dom.rating,
+    review_count: dom.reviewCount,
+    seller_name: dom.sellerName,
+    seller_id: sellerStore.sellerId,
+    store_url: sellerStore.storeUrl,
+    specs,
+    gallery_image_urls: imageUrls,
+    choice: {
+      image_url: choiceUrl,
+      group: dom.optionGroup,
+      name: dom.optionName,
+      price
+    }
+  }
+}

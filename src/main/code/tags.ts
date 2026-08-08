@@ -1,4 +1,4 @@
-import { utcNowIso, type CatalogDb } from '../db'
+import { utcNowIso, type CatalogDb } from '../core/connect'
 
 export function normalizeTagName(name: string): string {
   return String(name || '')

@@ -1,6 +1,6 @@
 import { access, readdir } from 'fs/promises'
 import { join } from 'path'
-import type { ProductChoiceRow, ProductImageRow } from '../catalog/repos/products'
+import type { ProductChoiceRow, ProductImageRow } from '../db/models/product'
 
 async function pathExists(p: string): Promise<boolean> {
   try {

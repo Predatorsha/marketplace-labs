@@ -1,31 +1,16 @@
-import type { AppConfig } from '../../config'
-import { connect, toRelativeFolder, utcNowIso, type CatalogDb } from '../db'
+import type { AppConfig } from '../config'
+import { connect, utcNowIso, type CatalogDb } from '../core/connect'
+import { toRelativeFolder } from '../core/paths'
+import type { ProductChoiceRow, ProductImageRow, ProductSpecRow } from '../db/models/product'
+import { jobLog } from '../jobs/log'
 import {
   extractPackQuantityFromTitle,
   inferPurposeFromProduct,
   inferTagsFromProduct
-} from '../../products/titleSignals'
+} from '../products/titleSignals'
 import { getProductTags, setProductTags } from './tags'
-import { jobLog } from '../../jobs/log'
 
-export type ProductChoiceRow = {
-  rel_path: string
-  name: string | null
-  group_name: string | null
-  price: string
-  sort_order?: number
-}
-
-export type ProductImageRow = {
-  rel_path: string
-  sort_order?: number
-}
-
-export type ProductSpecRow = {
-  key: string
-  value: string | null
-  sort_order?: number
-}
+export type { ProductChoiceRow, ProductImageRow, ProductSpecRow }
 
 function existingTagsForProduct(
   cfg: AppConfig,
@@ -209,13 +194,10 @@ export function upsertProductRecord(
     review_count?: string | null
     description?: string | null
     description_html?: string | null
-    discount?: string | null
     orders?: string | null
     seller_name?: string | null
     seller_id?: string | null
     store_url?: string | null
-    ships_from?: string | null
-    shipping?: string | null
     video?: string | null
     overwrite_purpose?: boolean
     status?: string | null
@@ -262,13 +244,10 @@ export function upsertProductRecord(
            review_count = COALESCE(?, review_count),
            description = COALESCE(?, description),
            description_html = COALESCE(?, description_html),
-           discount = COALESCE(?, discount),
            orders = COALESCE(?, orders),
            seller_name = COALESCE(?, seller_name),
            seller_id = COALESCE(?, seller_id),
            store_url = COALESCE(?, store_url),
-           ships_from = COALESCE(?, ships_from),
-           shipping = COALESCE(?, shipping),
            video = COALESCE(?, video),
            status = ?,
            last_seen_at = ?,
@@ -284,13 +263,10 @@ export function upsertProductRecord(
       reviewCountVal,
       normalizeTextField(opts.description),
       typeof opts.description_html === 'string' ? opts.description_html : null,
-      normalizeTextField(opts.discount),
       normalizeTextField(opts.orders),
       normalizeTextField(opts.seller_name),
       normalizeTextField(opts.seller_id),
       normalizeTextField(opts.store_url),
-      normalizeTextField(opts.ships_from),
-      normalizeTextField(opts.shipping),
       normalizeTextField(opts.video),
       statusVal,
       now,
@@ -304,10 +280,10 @@ export function upsertProductRecord(
     .prepare(
       `INSERT INTO products (
         platform, marketplace_product_id, title, url, folder_path, purpose, pack_quantity,
-        rating, review_count, description, description_html, discount, orders,
-        seller_name, seller_id, store_url, ships_from, shipping, video,
+        rating, review_count, description, description_html, orders,
+        seller_name, seller_id, store_url, video,
         status, last_seen_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       platform,
@@ -321,13 +297,10 @@ export function upsertProductRecord(
       reviewCountVal,
       normalizeTextField(opts.description),
       typeof opts.description_html === 'string' ? opts.description_html : null,
-      normalizeTextField(opts.discount),
       normalizeTextField(opts.orders),
       normalizeTextField(opts.seller_name),
       normalizeTextField(opts.seller_id),
       normalizeTextField(opts.store_url),
-      normalizeTextField(opts.ships_from),
-      normalizeTextField(opts.shipping),
       normalizeTextField(opts.video),
       statusVal,
       now,
@@ -392,6 +365,17 @@ function parseSpecsFromProduct(product: Record<string, unknown>): ProductSpecRow
   }))
 }
 
+/**
+ * Insert / update a scraped (or otherwise saved) product in the catalog DB.
+ *
+ * Expected `product` fields: product_id (required), title, url, purpose,
+ * pack_quantity, tags, rating, review_count, description, description_html,
+ * orders, seller_*, store_url, video, specs,
+ * local_files.images (string[]), local_files.choices ({ file, name, group, price }[]).
+ * At least one choice with a price is required.
+ *
+ * Called from scrapeProduct (scrape/index.ts) after scrape + disk save.
+ */
 export async function upsertProductFromSaved(
   cfg: AppConfig,
   opts: {
@@ -402,7 +386,13 @@ export async function upsertProductFromSaved(
     tags?: string[] | null
     choices?: ProductChoiceRow[] | null
   }
-): Promise<{ id: number; tags: string[]; my_rating: number | null }> {
+): Promise<{
+  id: number
+  tags: string[]
+  my_rating: number | null
+  purpose: string | null
+  pack_quantity: number | null
+}> {
   const title = String(opts.product.title || '')
   const explicit =
     opts.purpose !== undefined
@@ -477,13 +467,10 @@ export async function upsertProductFromSaved(
         typeof opts.product.description_html === 'string'
           ? opts.product.description_html
           : null,
-      discount: normalizeTextField(opts.product.discount),
       orders: normalizeTextField(opts.product.orders),
       seller_name: normalizeTextField(opts.product.seller_name),
       seller_id: normalizeTextField(opts.product.seller_id),
       store_url: normalizeTextField(opts.product.store_url),
-      ships_from: normalizeTextField(opts.product.ships_from),
-      shipping: normalizeTextField(opts.product.shipping),
       video: normalizeTextField(opts.product.video),
       overwrite_purpose: false,
       status: 'active'
@@ -508,7 +495,7 @@ export async function upsertProductFromSaved(
   } finally {
     db.close()
   }
-  return { id, tags: attached, my_rating }
+  return { id, tags: attached, my_rating, purpose, pack_quantity }
 }
 
 export function productFolderExists(

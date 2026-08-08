@@ -1,11 +1,7 @@
 import type { AppConfig } from '../config'
-import {
-  connect,
-  fromRelativeFolder,
-  toRelativeFolder,
-  utcNowIso
-} from '../catalog/db'
-import { setProductTags } from '../catalog/repos/tags'
+import { setProductTags } from '../code/tags'
+import { connect, utcNowIso } from '../core/connect'
+import { fromRelativeFolder, toRelativeFolder } from '../core/paths'
 import type {
   ProductEditableFields,
   ProductKey,

@@ -2,13 +2,14 @@ import { ipcMain } from 'electron'
 import { resolveHumanGate } from '../../browser/humanGate'
 
 export function registerOrdersHandlers(): void {
+  // TODO(playwright-scrape): separate order sync (not scrapeProduct). See scrape/orders.ts.
   ipcMain.handle('orders:start', async (_evt, args: { platform?: string }) => {
     const platform = String(args?.platform || '').trim() || 'unknown'
     return {
       ok: false,
       stub: true as const,
       platform: platform === 'temu' || platform === 'aliexpress' ? platform : 'aliexpress',
-      message: 'Order sync is not available yet (scrape not moved).'
+      message: 'Order sync is not available yet (see TODO in scrape/orders.ts).'
     }
   })
 

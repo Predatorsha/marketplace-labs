@@ -35,7 +35,9 @@ Paths live in [`config.yaml`](config.yaml):
 - `src/main/ipc` — IPC registration and handlers
 - `src/main/browser` — Playwright browser + login gate
 - `src/main/media` — `ml-media://` protocol for local product photos
-- `src/main/catalog` — SQLite schema, connect helpers, repos
+- `src/main/db` — SQLite schema + models
+- `src/main/code` — DB read/write (products, orders, tags)
+- `src/main/core` — connect, paths, migrate
 - `src/main/products` — list/get/update, gallery, on-disk product files
 - `src/preload` — IPC bridge
 - `src/renderer/src/pages` — Import + Catalog pages

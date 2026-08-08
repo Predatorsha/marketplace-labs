@@ -1,6 +1,6 @@
 import { ipcMain, shell } from 'electron'
 import { resolve } from 'path'
-import { marketRoot } from '../../catalog/db'
+import { marketRoot } from '../../core/paths'
 import { loadConfig } from '../../config'
 import { isPathUnderRoot } from '../../media/protocol'
 

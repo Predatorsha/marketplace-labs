@@ -2,17 +2,13 @@ import { access } from 'fs/promises'
 import { resolve } from 'path'
 import type { AppConfig } from '../config'
 import {
-  connect,
-  fromRelativeFolder,
-  toRelativeFolder,
-  type CatalogDb
-} from '../catalog/db'
-import {
   getProductChoices,
   getProductImages,
   joinChoicePrices
-} from '../catalog/repos/products'
-import { getProductTags } from '../catalog/repos/tags'
+} from '../code/products'
+import { getProductTags } from '../code/tags'
+import { connect, type CatalogDb } from '../core/connect'
+import { fromRelativeFolder, toRelativeFolder } from '../core/paths'
 import { toMediaUrl } from '../media/protocol'
 import type { ProductCard, ProductGetResult, ProductKey } from '../../shared/types'
 import { resolveChoiceItems, resolveGalleryPaths } from './gallery'

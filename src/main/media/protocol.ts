@@ -2,7 +2,7 @@ import { net, protocol } from 'electron'
 import { resolve } from 'path'
 import { pathToFileURL } from 'url'
 import type { AppConfig } from '../config'
-import { marketRoot } from '../catalog/db'
+import { marketRoot } from '../core/paths'
 
 export const MEDIA_SCHEME = 'ml-media'
 
