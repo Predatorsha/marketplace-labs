@@ -889,6 +889,14 @@ select.info-input {
   padding: 0 2px;
 }
 
+.info-archived-photos {
+  margin: -4px 0 10px;
+  padding: 0 2px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .catalog-card-meta {
   display: flex;
   flex-direction: column;

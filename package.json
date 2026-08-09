@@ -36,8 +36,7 @@
       "output": "release"
     },
     "files": [
-      "out/**/*",
-      "config.yaml"
+      "out/**/*"
     ],
     "extraResources": [
       {

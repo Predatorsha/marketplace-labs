@@ -1,4 +1,4 @@
-import type { Page } from 'playwright'
+import type { ElementHandle, Page } from 'playwright'
 import { sleep } from './util'
 
 /** Seller display name from the store card above Product details. */
@@ -44,11 +44,13 @@ export async function extractTemuSellerName(page: Page): Promise<string | null> 
   })
 }
 
-function parseMallFromUrl(raw: string): { storeUrl: string; sellerId: string | null } | null {
+/** Parse mall.html URL; only succeeds when mall_id is present. */
+function parseMallFromUrl(raw: string): { storeUrl: string; sellerId: string } | null {
   try {
     const u = new URL(raw)
     if (!/mall\.html/i.test(u.pathname + u.href)) return null
     const sellerId = u.searchParams.get('mall_id')
+    if (!sellerId) return null
     return { storeUrl: u.href, sellerId }
   } catch {
     const m = raw.match(/[?&]mall_id=(\d+)/i)
@@ -57,66 +59,78 @@ function parseMallFromUrl(raw: string): { storeUrl: string; sellerId: string | n
   }
 }
 
-/** Resolve mall link href from the product page (does not navigate). */
-async function findTemuMallHref(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    const avatarAnchor = Array.from(document.querySelectorAll('a[href*="mall"]')).find((a) => {
-      const img = a.querySelector('img')
-      if (!img) return false
-      const alt = (img.getAttribute('alt') || '').trim()
-      const around = (a.closest('section, article, div')?.textContent || '').slice(0, 600)
-      return (
-        !!alt &&
-        !/^avatar$/i.test(alt) &&
-        /followers|shop all items|started to sell/i.test(around)
-      )
-    }) as HTMLAnchorElement | undefined
-    if (avatarAnchor?.href) return avatarAnchor.href
-
-    const shop = Array.from(document.querySelectorAll('a[href]')).find((a) =>
-      /shop all items/i.test((a.textContent || '').replace(/\s+/g, ' '))
-    ) as HTMLAnchorElement | undefined
-    return shop?.href || null
+async function queryStoreAvatar(
+  page: Page
+): Promise<ElementHandle<HTMLAnchorElement> | null> {
+  const handle = await page.evaluateHandle(() => {
+    const root = document.querySelector('#main_scale > div.mainContent')
+    if (!root) return null
+    const withImg = root.querySelector('a[href*="mall.html"] img')?.closest('a')
+    if (withImg instanceof HTMLAnchorElement) return withImg
+    const any = root.querySelector('a[href*="mall.html"]')
+    return any instanceof HTMLAnchorElement ? any : null
   })
+  const el = handle.asElement()
+  if (el) return el as ElementHandle<HTMLAnchorElement>
+  await handle.dispose().catch(() => undefined)
+  return null
 }
 
 /**
- * Resolve seller store URL + mall_id without leaving the product tab.
- * Prefer parsing the mall href on the card; else open mall in a background tab and close it.
+ * Store icon: `#main_scale > div.mainContent a[href*="mall.html"]` (with img).
+ * Light scroll only — a few short steps, not a full-page crawl.
+ */
+async function findTemuStoreAvatar(
+  page: Page
+): Promise<ElementHandle<HTMLAnchorElement> | null> {
+  const found = await queryStoreAvatar(page)
+  if (found) return found
+
+  for (let i = 0; i < 4; i++) {
+    const atBottom = await page.evaluate(() => {
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      if (window.scrollY >= max - 8) return true
+      window.scrollBy(0, Math.floor(window.innerHeight * 0.4))
+      return false
+    })
+    await sleep(250)
+    const again = await queryStoreAvatar(page)
+    if (again) return again
+    if (atBottom) break
+  }
+  return null
+}
+
+/**
+ * After product fields + photos: click store icon in the same tab,
+ * capture store_url with mall_id. Soft-fails to nulls; leaves page on mall.
  */
 export async function resolveTemuSellerStore(
   page: Page
 ): Promise<{ storeUrl: string | null; sellerId: string | null }> {
-  const href = await findTemuMallHref(page)
-  if (!href) return { storeUrl: null, sellerId: null }
-
-  let absolute: string
   try {
-    absolute = new URL(href, page.url()).href
-  } catch {
-    return { storeUrl: null, sellerId: null }
-  }
+    const avatar = await findTemuStoreAvatar(page)
+    if (!avatar) return { storeUrl: null, sellerId: null }
 
-  const fromHref = parseMallFromUrl(absolute)
-  if (fromHref?.sellerId) return fromHref
+    try {
+      await avatar.scrollIntoViewIfNeeded()
+      await sleep(300)
+      await avatar.click({ timeout: 10_000 })
+    } finally {
+      await avatar.dispose().catch(() => undefined)
+    }
 
-  // Background tab: product page stays put; we never bring the mall tab to front.
-  const storePage = await page.context().newPage()
-  try {
-    await storePage.goto(absolute, { waitUntil: 'domcontentloaded', timeout: 25_000 })
-    await sleep(300)
+    await page.waitForLoadState('domcontentloaded').catch(() => undefined)
 
     const deadline = Date.now() + 12_000
     while (Date.now() < deadline) {
-      const parsed = parseMallFromUrl(storePage.url())
-      if (parsed?.sellerId) return parsed
+      const parsed = parseMallFromUrl(page.url())
+      if (parsed) return parsed
       await sleep(200)
     }
 
-    return parseMallFromUrl(storePage.url()) ?? { storeUrl: null, sellerId: null }
+    return { storeUrl: null, sellerId: null }
   } catch {
     return { storeUrl: null, sellerId: null }
-  } finally {
-    await storePage.close().catch(() => undefined)
   }
 }

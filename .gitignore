@@ -4,6 +4,7 @@ release/
 dist/
 data/
 .browser-profile/
+config.local.yaml
 *.tsbuildinfo
 .DS_Store
 .env

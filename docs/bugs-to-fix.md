@@ -7,6 +7,10 @@ Already fixed elsewhere — do **not** re-open (and do not put them in `docs/bug
 
 - Temu login short-circuit on “Welcome back” / “Hello, …” (`src/main/browser/auth/temu.ts`) — fixed.
 - Gallery loop pushing duplicates when preview does not advance (`src/main/scrape/temu/gallery.ts`) — fixed (`prevKey` check).
+- Import “Open folder” relative path (`shell.ts` + `fromRelativeFolder`) — fixed.
+- Folder-key product lookup vs cwd (`products/load.ts`) — fixed.
+- Relative `market_root` / `catalog_db` via `resolveAppPath` / `dataRoot` (`paths.ts`, `config.ts`) — fixed.
+- Packaged app shipping developer-absolute `config.yaml` — fixed (portable `config.yaml` + gitignored `config.local.yaml`).
 
 When a bug is fixed: remove its section from this file.
 When we decide not to fix a bug: move its section to `docs/bugs-wont-fix.md` (with a short reason).
@@ -17,38 +21,6 @@ Priorities: **P1** user/data breakers, **P2** wrong data or unfinished wiring, *
 
 ## P1
 
-### P1-1 — Import “Open folder” fails on relative path
-
-**Where:** `src/main/ipc/handlers/shell.ts` (~line 11); return path from `src/main/scrape/index.ts` (~66) via `src/main/products/files.ts` (`folderRel`).
-
-**What:** After a successful product download, Import UI “Open folder” calls `shell:openPath` with the scrape result `folder`. That value is **relative to `market_root`**. Handler does `resolve(p)` against **process cwd**, then `isPathUnderRoot(abs, marketRoot(cfg))`. Relative folder resolves outside the catalog root → `{ ok: false, error: 'Path is outside the catalog root folder' }`.
-
-**Why Catalog open works:** `getProduct` returns an absolute `folder` via `fromRelativeFolder`.
-
-**Fix direction:** Resolve relative paths with `fromRelativeFolder` / `marketRoot` before the under-root check (same as product open). Do not use bare `resolve(p)` for catalog-relative folders.
-
----
-
-### P1-2 — Folder-key product lookup resolves relative paths against cwd
-
-**Where:** `src/main/products/load.ts` — `findProductRow` (~54–66).
-
-**What:** For `ProductKey` `{ folder }`, code does `resolve(normalized.folder)` then `toRelativeFolder`. DB stores `folder_path` as market-relative (e.g. `2026-08-08 short`). Looking up with that relative string resolves to `<cwd>/…`, candidates miss the row → `null`. Breaks `getProduct` / `updateProduct` by folder key and App folder fallback when platform/id missing (`src/renderer/src/App.tsx`).
-
-**Fix direction:** Prefer `fromRelativeFolder` / query the raw relative `folder_path` first; never treat relative folder as cwd-relative.
-
----
-
-### P1-3 — Relative `market_root` / `catalog_db` follow cwd, not app root
-
-**Where:** `src/main/core/paths.ts` — `catalogDbPath` / `marketRoot` (~5–12). Contrast: `resolveAppPath` in `src/main/config.ts` (~88–91).
-
-**What:** Relative config values use bare `resolve(raw)` → depend on `process.cwd()`. Launch from shortcut / another shell / packaged app can open the wrong DB or create a second empty catalog. Absolute paths in current `config.yaml` hide this in day-to-day local use.
-
-**Fix direction:** Resolve relative output paths through `resolveAppPath` / `appRoot()`, same as browser profile paths.
-
----
-
 ### P1-4 — `parseMoney` treats `0.xxx` (3 fraction digits) as thousands
 
 **Where:** `src/main/code/orders.ts` — `normalizeNumericToken` (~31–32), used by `parseMoney` (~37–50), order line upserts (~171–174).
@@ -56,16 +28,6 @@ Priorities: **P1** user/data breakers, **P2** wrong data or unfinished wiring, *
 **What:** Rule “1–3 digits before separator + exactly 3 after ⇒ thousands” turns `0.999` → `999`, `0,123` → `123`. Common decimal prices with three places become wildly wrong `unit_price` once order sync is wired.
 
 **Fix direction:** Do not apply thousands grouping when the integer part is `0`, or tighten the heuristic (e.g. require thousands only for values that look like `1.234` / `12.345` with locale rules). Add a few unit cases.
-
----
-
-### P1-5 — Packaged app ships developer-absolute `config.yaml`
-
-**Where:** root `config.yaml` (absolute `K:/marketplace-labs/...`); `package.json` electron-builder `files` / `extraResources` include that config.
-
-**What:** `npm run dist` embeds machine-specific absolute paths. Other machines get broken DB root, market root, and browser profile on first run.
-
-**Fix direction:** Ship a relative/template config for dist; resolve under userData/app root at runtime. Keep local absolute config out of the packaged artifact (or generate on first launch).
 
 ---
 

@@ -10,7 +10,6 @@ export type AppConfig = {
   output: {
     catalog_db: string
     market_root: string
-    folder_pattern: string
   }
 }
 
@@ -45,8 +44,7 @@ function parseConfig(raw: unknown, path: string): AppConfig {
     },
     output: {
       catalog_db: requireNonEmptyString(outputObj.catalog_db, 'output.catalog_db'),
-      market_root: requireNonEmptyString(outputObj.market_root, 'output.market_root'),
-      folder_pattern: requireNonEmptyString(outputObj.folder_pattern, 'output.folder_pattern')
+      market_root: requireNonEmptyString(outputObj.market_root, 'output.market_root')
     }
   }
 }
@@ -58,8 +56,25 @@ export function appRoot(): string {
   return resolve(__dirname, '../..')
 }
 
+/**
+ * Writable data root for relative config paths.
+ * Packaged: Electron userData (survives rebuilds / Program Files).
+ * Dev: project root (same as appRoot).
+ */
+export function dataRoot(): string {
+  if (app.isPackaged) {
+    return app.getPath('userData')
+  }
+  return appRoot()
+}
+
 export function configPath(): string {
   const candidates = [
+    // Dev-only machine override (gitignored); never ship this.
+    join(appRoot(), 'config.local.yaml'),
+    // Packaged user override next to catalog data.
+    app.isPackaged ? join(app.getPath('userData'), 'config.yaml') : '',
+    // electron-builder extraResources
     join(process.resourcesPath || '', 'config.yaml'),
     join(appRoot(), 'config.yaml'),
     join(process.cwd(), 'config.yaml')
@@ -85,7 +100,8 @@ export function loadConfig(): AppConfig {
   return parseConfig(parsed, path)
 }
 
+/** Absolute path as-is; relative paths anchor to dataRoot() (never cwd). */
 export function resolveAppPath(p: string): string {
   if (isAbsolute(p)) return p
-  return resolve(appRoot(), p)
+  return resolve(dataRoot(), p)
 }

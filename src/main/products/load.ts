@@ -11,6 +11,7 @@ import { fromRelativeFolder, toRelativeFolder } from '../core/paths'
 import { toMediaUrl } from '../media/protocol'
 import type { ProductCard, ProductGetResult, ProductKey } from '../../shared/types'
 import { resolveChoiceItems, resolveGalleryPaths } from './gallery'
+import { countArchivedSnapshots } from './snapshots'
 
 export type ProductRow = {
   id: number
@@ -105,7 +106,8 @@ export function buildProductCard(
   cfg: AppConfig,
   tags: string[] = [],
   imageUrls: string[] = [],
-  choices: ProductCard['choices'] = []
+  choices: ProductCard['choices'] = [],
+  archived_photo_sets = 0
 ): ProductCard {
   const folderAbs = fromRelativeFolder(cfg, row.folder_path) || ''
   const folder_path =
@@ -131,7 +133,8 @@ export function buildProductCard(
     description: typeof row.description === 'string' ? row.description : null,
     tags,
     image_urls: imageUrls,
-    choices
+    choices,
+    archived_photo_sets
   }
 }
 
@@ -163,6 +166,7 @@ export async function getProduct(cfg: AppConfig, key: ProductKey): Promise<Produ
         group: c.group,
         price: c.price
       }))
+      const archived_photo_sets = countArchivedSnapshots(folderAbs)
       return {
         ok: true,
         product: buildProductCard(
@@ -170,7 +174,8 @@ export async function getProduct(cfg: AppConfig, key: ProductKey): Promise<Produ
           cfg,
           tags,
           imageUrls,
-          choices
+          choices,
+          archived_photo_sets
         )
       }
     } finally {

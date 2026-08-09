@@ -218,7 +218,11 @@ export function upsertProductRecord(
       : null
   const ratingVal = normalizeTextField(opts.rating)
   const reviewCountVal = normalizeTextField(opts.review_count)
-  const statusVal = (opts.status || 'active').trim().toLowerCase() || 'active'
+  // Only apply marketplace/UI status when explicitly provided; otherwise keep DB value.
+  const statusVal =
+    opts.status != null && String(opts.status).trim()
+      ? String(opts.status).trim().toLowerCase()
+      : null
   const now = utcNowIso()
 
   const row = db
@@ -233,6 +237,8 @@ export function upsertProductRecord(
   if (row) {
     const keepPurpose =
       purposeVal && (opts.overwrite_purpose || !row.purpose) ? purposeVal : row.purpose
+    const nextStatus =
+      statusVal && statusVal !== String(row.status || '').toLowerCase() ? statusVal : null
     db.prepare(
       `UPDATE products
        SET title = COALESCE(?, title),
@@ -249,7 +255,7 @@ export function upsertProductRecord(
            seller_id = COALESCE(?, seller_id),
            store_url = COALESCE(?, store_url),
            video = COALESCE(?, video),
-           status = ?,
+           status = COALESCE(?, status),
            last_seen_at = ?,
            updated_at = ?
        WHERE id = ?`
@@ -268,7 +274,7 @@ export function upsertProductRecord(
       normalizeTextField(opts.seller_id),
       normalizeTextField(opts.store_url),
       normalizeTextField(opts.video),
-      statusVal,
+      nextStatus,
       now,
       now,
       row.id
@@ -276,6 +282,7 @@ export function upsertProductRecord(
     return row.id
   }
 
+  const insertStatus = statusVal || 'active'
   const info = db
     .prepare(
       `INSERT INTO products (
@@ -302,12 +309,96 @@ export function upsertProductRecord(
       normalizeTextField(opts.seller_id),
       normalizeTextField(opts.store_url),
       normalizeTextField(opts.video),
-      statusVal,
+      insertStatus,
       now,
       now,
       now
     )
   return Number(info.lastInsertRowid)
+}
+
+/**
+ * Update marketplace availability (`active` / `archived`) for an existing catalog row.
+ * No-op write when status is already the same. Used when the PDP is unavailable
+ * and a full re-scrape cannot collect gallery/price.
+ */
+export function applyProductMarketplaceStatus(
+  cfg: AppConfig,
+  opts: {
+    platform: string
+    marketplace_product_id: string
+    status: 'active' | 'archived'
+    url?: string | null
+  }
+): {
+  ok: true
+  id: number
+  status: string
+  changed: boolean
+  folder: string | null
+  title: string | null
+  url: string | null
+} | { ok: false; error: string } {
+  const platform = (opts.platform || '').trim().toLowerCase()
+  const marketplace_product_id = String(opts.marketplace_product_id || '').trim()
+  if (!platform || !marketplace_product_id) {
+    return { ok: false, error: 'platform and marketplace_product_id are required' }
+  }
+  const next = opts.status === 'archived' ? 'archived' : 'active'
+  const db = connect(cfg)
+  try {
+    const row = db
+      .prepare(
+        `SELECT id, status, folder_path, title, url FROM products
+         WHERE platform = ? AND marketplace_product_id = ?`
+      )
+      .get(platform, marketplace_product_id) as
+      | {
+          id: number
+          status: string
+          folder_path: string | null
+          title: string | null
+          url: string | null
+        }
+      | undefined
+    if (!row) {
+      return {
+        ok: false,
+        error: 'Product is unavailable for purchase and is not in the catalog yet'
+      }
+    }
+    const prev = String(row.status || 'active').toLowerCase()
+    const changed = prev !== next
+    const now = utcNowIso()
+    if (changed || opts.url) {
+      db.prepare(
+        `UPDATE products
+         SET status = COALESCE(?, status),
+             url = COALESCE(?, url),
+             last_seen_at = ?,
+             updated_at = ?
+         WHERE id = ?`
+      ).run(changed ? next : null, opts.url ?? null, now, now, row.id)
+    } else {
+      db.prepare(`UPDATE products SET last_seen_at = ? WHERE id = ?`).run(now, row.id)
+    }
+    if (changed) {
+      jobLog(
+        `catalog status ${prev} → ${next} (platform=${platform} product_id=${marketplace_product_id})`
+      )
+    }
+    return {
+      ok: true,
+      id: row.id,
+      status: changed ? next : prev,
+      changed,
+      folder: row.folder_path,
+      title: row.title,
+      url: opts.url ?? row.url
+    }
+  } finally {
+    db.close()
+  }
 }
 
 function parseChoicesFromProduct(product: Record<string, unknown>): ProductChoiceRow[] {
@@ -473,11 +564,21 @@ export async function upsertProductFromSaved(
       store_url: normalizeTextField(opts.product.store_url),
       video: normalizeTextField(opts.product.video),
       overwrite_purpose: false,
-      status: 'active'
+      status:
+        opts.product.status === 'archived'
+          ? 'archived'
+          : opts.product.status === 'active'
+            ? 'active'
+            : null
     })
     setProductChoices(db, id, choices)
-    setProductImages(db, id, parseImagesFromProduct(opts.product))
-    setProductSpecs(db, id, parseSpecsFromProduct(opts.product))
+    // Replace children only when the scrape produced rows. Empty arrays mean
+    // "not found this run" (details collapsed, image download fails) — keep
+    // the previous catalog data instead of DELETE-wiping it.
+    const images = parseImagesFromProduct(opts.product)
+    if (images.length) setProductImages(db, id, images)
+    const specs = parseSpecsFromProduct(opts.product)
+    if (specs.length) setProductSpecs(db, id, specs)
     const existing = getProductTags(db, id)
     if (existing.length) {
       attached = existing

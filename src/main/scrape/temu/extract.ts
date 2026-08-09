@@ -10,15 +10,15 @@ import { collectTemuGalleryUrls } from './gallery'
 import { extractTemuSellerName } from './seller'
 import type { TemuDomExtract } from './types'
 
-/** Collect all first-screen fields from the open Temu product page. */
+/** Collect fields then gallery from the open Temu product page (no scroll before photos). */
 export async function extractTemuDom(page: Page): Promise<TemuDomExtract> {
   const title = await extractTemuTitle(page)
   const priceRaw = await extractTemuPriceRaw(page)
   const reviews = await extractTemuReviews(page)
   const option = await extractTemuOption(page)
-  const gallery = await collectTemuGalleryUrls(page)
-  const specs = await extractTemuSpecs(page)
   const sellerName = await extractTemuSellerName(page)
+  const specs = await extractTemuSpecs(page)
+  const gallery = await collectTemuGalleryUrls(page)
 
   return {
     title,

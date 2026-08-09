@@ -32,6 +32,11 @@ export type ScrapedProduct = {
   store_url?: string | null
   video?: string | null
   specs?: Record<string, unknown>
+  /**
+   * Marketplace availability from the live PDP.
+   * `archived` = unavailable for purchase; `active` = normal buyable page.
+   */
+  status?: 'active' | 'archived'
   /** Remote gallery URLs (excludes choice image). Consumed by saveScrapedProductToDisk. */
   gallery_image_urls?: string[]
   /** Single (or primary) choice draft before disk save. */

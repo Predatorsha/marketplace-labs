@@ -19,6 +19,7 @@ export type ProductDetailsData = {
   status: string | null
   image_urls: string[]
   choices?: ProductChoiceItem[]
+  archived_photo_sets?: number
 }
 
 type Props = {
@@ -218,6 +219,12 @@ export default function ProductDetailPanels({
                 size="md"
               />
             </div>
+          ) : null}
+
+          {hasProduct && (product?.archived_photo_sets ?? 0) > 0 ? (
+            <p className="info-archived-photos">
+              Archived photos: {product?.archived_photo_sets} sets
+            </p>
           ) : null}
 
           <dl className={`info-fields${editing ? ' editing' : ''}`}>
@@ -435,6 +442,7 @@ export function productCardToDetails(product: {
   status: string
   image_urls?: string[]
   choices?: ProductChoiceItem[]
+  archived_photo_sets?: number
 }): ProductDetailsData {
   return {
     platform: product.platform,
@@ -450,6 +458,7 @@ export function productCardToDetails(product: {
     tags: product.tags || [],
     status: product.status,
     image_urls: product.image_urls || [],
-    choices: product.choices || []
+    choices: product.choices || [],
+    archived_photo_sets: product.archived_photo_sets ?? 0
   }
 }

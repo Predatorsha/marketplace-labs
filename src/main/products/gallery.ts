@@ -1,6 +1,7 @@
 import { access, readdir } from 'fs/promises'
 import { join } from 'path'
 import type { ProductChoiceRow, ProductImageRow } from '../db/models/product'
+import { resolveActiveSnapshot } from './snapshots'
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -9,6 +10,11 @@ async function pathExists(p: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** Media root for a product: active timestamp snapshot, or null. */
+function mediaRoot(productRootAbs: string): string | null {
+  return resolveActiveSnapshot(productRootAbs)
 }
 
 async function resolveRelPaths(folderAbs: string, relPaths: string[]): Promise<string[]> {
@@ -40,11 +46,14 @@ async function scanImagesDir(folderAbs: string): Promise<string[]> {
   }
 }
 
-/** First gallery photo: product_images[0], else images/01.* / first file. */
+/** First gallery photo from active snapshot: product_images[0], else images/01.* / first file. */
 export async function resolveCoverPath(
-  folderAbs: string,
+  productRootAbs: string,
   images: ProductImageRow[] = []
 ): Promise<string | null> {
+  const folderAbs = mediaRoot(productRootAbs)
+  if (!folderAbs) return null
+
   const fromDb = await resolveRelPaths(
     folderAbs,
     images.map((img) => img.rel_path)
@@ -72,18 +81,19 @@ export type ResolvedChoice = {
   price: string
 }
 
-/** Choice rows from DB; absPath null when file missing or rel_path empty. */
+/** Choice rows from DB; paths resolved under the active snapshot. */
 export async function resolveChoiceItems(
-  folderAbs: string,
+  productRootAbs: string,
   choices: ProductChoiceRow[]
 ): Promise<ResolvedChoice[]> {
+  const folderAbs = mediaRoot(productRootAbs)
   const out: ResolvedChoice[] = []
   for (const row of choices) {
     const rel = String(row.rel_path || '')
       .trim()
       .replace(/\\/g, '/')
     let absPath: string | null = null
-    if (rel) {
+    if (rel && folderAbs) {
       const abs = join(folderAbs, rel)
       if (await pathExists(abs)) absPath = abs
     }
@@ -98,11 +108,13 @@ export async function resolveChoiceItems(
   return out
 }
 
-/** Gallery paths from product_images order, else scan images/. */
+/** Gallery paths from active snapshot (DB order, else scan images/). */
 export async function resolveGalleryPaths(
-  folderAbs: string,
+  productRootAbs: string,
   images: ProductImageRow[] = []
 ): Promise<string[]> {
+  const folderAbs = mediaRoot(productRootAbs)
+  if (!folderAbs) return []
   const fromDb = await resolveRelPaths(
     folderAbs,
     images.map((img) => img.rel_path)

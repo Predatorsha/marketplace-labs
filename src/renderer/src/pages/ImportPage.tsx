@@ -33,6 +33,7 @@ export default function ImportPage({
   const [price, setPrice] = useState<string | null>(null)
   const [rating, setRating] = useState<string | null>(null)
   const [reviewCount, setReviewCount] = useState<string | null>(null)
+  const [archivedPhotoSets, setArchivedPhotoSets] = useState(0)
 
   useEffect(() => {
     if (!lastDownload?.ok || !lastDownload.platform || !lastDownload.product_id) {
@@ -41,6 +42,7 @@ export default function ImportPage({
       setPrice(lastDownload?.price ?? null)
       setRating(null)
       setReviewCount(null)
+      setArchivedPhotoSets(0)
       return
     }
     let cancelled = false
@@ -57,12 +59,14 @@ export default function ImportPage({
           setPrice(res.product.price)
           setRating(res.product.rating)
           setReviewCount(res.product.review_count)
+          setArchivedPhotoSets(res.product.archived_photo_sets ?? 0)
         } else {
           setImageUrls([])
           setChoices([])
           setPrice(lastDownload.price ?? null)
           setRating(null)
           setReviewCount(null)
+          setArchivedPhotoSets(0)
         }
       })
       .catch(() => {
@@ -72,6 +76,7 @@ export default function ImportPage({
           setPrice(lastDownload.price ?? null)
           setRating(null)
           setReviewCount(null)
+          setArchivedPhotoSets(0)
         }
       })
     return () => {
@@ -95,9 +100,10 @@ export default function ImportPage({
       tags: Array.isArray(lastDownload.tags) ? lastDownload.tags : [],
       status: lastDownload.status || 'active',
       image_urls: imageUrls,
-      choices
+      choices,
+      archived_photo_sets: archivedPhotoSets
     }
-  }, [lastDownload, imageUrls, choices, price, rating, reviewCount])
+  }, [lastDownload, imageUrls, choices, price, rating, reviewCount, archivedPhotoSets])
 
   return (
     <div className="import-page">

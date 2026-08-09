@@ -2,10 +2,9 @@ import type { Page } from 'playwright'
 import { ensureTemuLoggedIn } from '../../browser/auth/temu'
 import { normalizeDisplayPrice } from '../price'
 import type { ScrapedProduct } from '../product'
-import { expandTemuProductDetails } from './details'
+import { isTemuProductUnavailable } from './availability'
 import { extractTemuDom } from './extract'
 import { imageDedupeKey, upgradeTemuImageUrl } from './images'
-import { resolveTemuSellerStore } from './seller'
 import { sleep } from './util'
 
 export { upgradeTemuImageUrl } from './images'
@@ -24,6 +23,7 @@ function resolveGoodsId(pageUrl: string, fallback: string): string {
 /**
  * Scrape a Temu product page (single-choice / no variant picker case).
  * Navigates, waits for login gate if needed, extracts fields from the first screen.
+ * Unavailable listings return `status: 'archived'` without gallery/price (caller updates DB only).
  */
 export async function scrapeTemuProductPage(
   page: Page,
@@ -42,13 +42,26 @@ export async function scrapeTemuProductPage(
 
   await page
     .waitForFunction(
-      () =>
-        /Est\.?/i.test(document.body?.innerText || '') || document.querySelectorAll('img').length > 5,
+      () => {
+        const t = document.body?.innerText || ''
+        return (
+          /unavailable for purchase/i.test(t) ||
+          /item details are unavailable/i.test(t) ||
+          /Est\.?/i.test(t) ||
+          document.querySelectorAll('img').length > 5
+        )
+      },
       { timeout: 45_000 }
     )
     .catch(() => undefined)
 
-  await expandTemuProductDetails(page)
+  if (await isTemuProductUnavailable(page)) {
+    return {
+      product_id: resolveGoodsId(page.url(), opts.productId),
+      url: page.url() || opts.url,
+      status: 'archived'
+    }
+  }
 
   const dom = await extractTemuDom(page)
   const gallery = (dom.gallery || [])
@@ -81,18 +94,18 @@ export async function scrapeTemuProductPage(
     dom.specs && Object.keys(dom.specs).length > 0 ? { ...dom.specs } : undefined
 
   const productPageUrl = page.url() || opts.url
-  const sellerStore = await resolveTemuSellerStore(page)
 
   return {
     product_id: productId,
     url: productPageUrl,
     title: text,
     description: text,
+    status: 'active',
     rating: dom.rating,
     review_count: dom.reviewCount,
     seller_name: dom.sellerName,
-    seller_id: sellerStore.sellerId,
-    store_url: sellerStore.storeUrl,
+    seller_id: null,
+    store_url: null,
     specs,
     gallery_image_urls: imageUrls,
     choice: {

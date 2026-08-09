@@ -70,6 +70,8 @@ export type ProductCard = {
   image_urls: string[]
   /** Choice photos with per-option prices (AliExpress / Temu). */
   choices: ProductChoiceItem[]
+  /** Non-active timestamp photo sets under the product root. */
+  archived_photo_sets: number
 }
 
 export type ProductGetResult = {

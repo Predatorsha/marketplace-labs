@@ -13,11 +13,13 @@ npm run dev
 
 ## Config
 
-Paths live in [`config.yaml`](config.yaml):
+Paths live in [`config.yaml`](config.yaml) (relative by default):
 
 - `output.market_root` — data root
 - `output.catalog_db` — SQLite catalog
 - `browser.market_profile_dir` — Playwright Chromium profile
+
+Relative paths resolve to the project root in `npm run dev`, and to Electron `userData` in a packaged build. Absolute paths are used as-is. For a machine-specific override that must not ship in `dist`, use gitignored `config.local.yaml` (same shape as `config.yaml`).
 
 ## Scripts
 

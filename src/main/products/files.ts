@@ -1,13 +1,15 @@
-import { mkdirSync, existsSync, writeFileSync } from 'fs'
+import { mkdirSync, existsSync, writeFileSync, readdirSync, statSync, copyFileSync } from 'fs'
 import { join } from 'path'
 import type { AppConfig } from '../config'
-import { marketRoot, toRelativeFolder } from '../core/paths'
+import { productFolderExists } from '../code/products'
+import { fromRelativeFolder, marketRoot, toRelativeFolder } from '../core/paths'
 import type { ScrapedProduct } from '../scrape/product'
 import type { MarketplacePlatform } from '../scrape/url'
 import { jobLog } from '../jobs/log'
+import { formatSnapshotDirName, resolveActiveSnapshot } from './snapshots'
 
 export type SavedProductOnDisk = {
-  /** Path relative to market_root (stored in SQLite folder_path). */
+  /** Product root relative to market_root (stored in SQLite folder_path). */
   folder: string
   /** Scraped product with local_files.images / local_files.choices filled. */
   product: ScrapedProduct
@@ -17,33 +19,35 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }
 
-function localDateStamp(d = new Date()): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-}
-
-function shortSlug(title: string, productId: string): string {
-  const base = String(title || '')
-    .normalize('NFKD')
-    .replace(/[^\w\s-]+/g, ' ')
+/** `{product_id} {title}` — sanitized for Windows paths. */
+function productRootFolderName(productId: string, title: string): string {
+  const id = String(productId || '').trim() || 'unknown'
+  let name = String(title || '')
+    .replace(/[<>:"/\\|?*]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 48)
+    .slice(0, 120)
     .trim()
-  return base || productId
+  if (!name) name = id
+  return `${id} ${name}`.replace(/\s+/g, ' ').trim()
 }
 
-function applyFolderPattern(
-  pattern: string,
-  opts: { date: string; short: string; id: string; platform: string }
-): string {
-  return pattern
-    .replace(/\{date\}/gi, opts.date)
-    .replace(/\{short\}/gi, opts.short)
-    .replace(/\{id\}/gi, opts.id)
-    .replace(/\{platform\}/gi, opts.platform)
-    .replace(/[<>:"|?*]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+function uniqueProductRootAbs(root: string, baseName: string): string {
+  let candidate = join(root, baseName)
+  if (!existsSync(candidate)) return candidate
+  for (let i = 2; i < 1000; i++) {
+    candidate = join(root, `${baseName} (${i})`)
+    if (!existsSync(candidate)) return candidate
+  }
+  return join(root, `${baseName} (${Date.now()})`)
+}
+
+function allocateSnapshotAbs(productRootAbs: string): string {
+  for (let i = 0; i < 1000; i++) {
+    const candidate = join(productRootAbs, formatSnapshotDirName(new Date(Date.now() + i * 1000)))
+    if (!existsSync(candidate)) return candidate
+  }
+  return join(productRootAbs, formatSnapshotDirName())
 }
 
 function extFromUrlOrType(url: string, contentType: string | null): string {
@@ -79,19 +83,59 @@ async function downloadBinary(
   return { buffer, contentType }
 }
 
-function uniqueFolderAbs(root: string, baseName: string): string {
-  let candidate = join(root, baseName)
-  if (!existsSync(candidate)) return candidate
-  for (let i = 2; i < 1000; i++) {
-    candidate = join(root, `${baseName} (${i})`)
-    if (!existsSync(candidate)) return candidate
+function listFiles(dir: string): string[] {
+  if (!existsSync(dir)) return []
+  const out: string[] = []
+  for (const name of readdirSync(dir)) {
+    if (name.startsWith('.')) continue
+    const abs = join(dir, name)
+    try {
+      if (statSync(abs).isFile()) out.push(name)
+    } catch {
+      /* ignore */
+    }
   }
-  return join(root, `${baseName} (${Date.now()})`)
+  out.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  return out
+}
+
+/** Copy files from srcDir into destDir; return destination basenames. */
+function copyDirFiles(srcDir: string, destDir: string): string[] {
+  const names = listFiles(srcDir)
+  if (!names.length) return []
+  mkdirSync(destDir, { recursive: true })
+  const written: string[] = []
+  for (const name of names) {
+    copyFileSync(join(srcDir, name), join(destDir, name))
+    written.push(name)
+  }
+  return written
 }
 
 /**
- * Persist scraped product assets under output.market_root using folder_pattern.
- * Gallery → images/ (excludes choice). Choice image → choices/.
+ * Resolve product root folder (stable across re-scrapes).
+ * Reuses catalog folder_path when present on disk; else `{id} {title}`.
+ */
+function resolveProductRootAbs(
+  cfg: AppConfig,
+  opts: { platform: MarketplacePlatform; productId: string; title: string }
+): { rootAbs: string; reused: boolean } {
+  const market = marketRoot(cfg)
+  const existingRel = productFolderExists(cfg, opts.platform, opts.productId)
+  if (existingRel) {
+    const existingAbs = fromRelativeFolder(cfg, existingRel)
+    if (existingAbs && existsSync(existingAbs)) {
+      return { rootAbs: existingAbs, reused: true }
+    }
+  }
+  const baseName = productRootFolderName(opts.productId, opts.title)
+  return { rootAbs: uniqueProductRootAbs(market, baseName), reused: false }
+}
+
+/**
+ * Persist scraped product assets under market_root:
+ * `{id} {title}/{YYYY_MM_DD HH-mm-ss}/{images,choices}/`
+ * `folder_path` in DB is the product root. Each download with files → new snapshot.
  */
 export async function saveScrapedProductToDisk(
   cfg: AppConfig,
@@ -102,61 +146,87 @@ export async function saveScrapedProductToDisk(
 ): Promise<SavedProductOnDisk> {
   const product = { ...opts.product }
   const title = String(product.title || product.description || product.product_id)
-  const root = marketRoot(cfg)
-  mkdirSync(root, { recursive: true })
+  const market = marketRoot(cfg)
+  mkdirSync(market, { recursive: true })
 
-  const folderName = applyFolderPattern(cfg.output.folder_pattern, {
-    date: localDateStamp(),
-    short: shortSlug(title, product.product_id),
-    id: product.product_id,
-    platform: opts.platform
+  const { rootAbs, reused } = resolveProductRootAbs(cfg, {
+    platform: opts.platform,
+    productId: String(product.product_id || ''),
+    title
   })
-  const folderAbs = uniqueFolderAbs(root, folderName)
-  mkdirSync(folderAbs, { recursive: true })
-  const imagesDir = join(folderAbs, 'images')
-  const choicesDir = join(folderAbs, 'choices')
-  mkdirSync(imagesDir, { recursive: true })
-  mkdirSync(choicesDir, { recursive: true })
-
-  const galleryUrls = Array.isArray(product.gallery_image_urls) ? product.gallery_image_urls : []
-  const imageRels: string[] = []
-  for (let i = 0; i < galleryUrls.length; i++) {
-    const url = galleryUrls[i]
-    try {
-      const { buffer, contentType } = await downloadBinary(url)
-      const ext = extFromUrlOrType(url, contentType)
-      const name = `${pad2(i + 1)}.${ext}`
-      writeFileSync(join(imagesDir, name), buffer)
-      imageRels.push(`images/${name}`)
-    } catch (exc) {
-      jobLog(
-        `save image fail #${i + 1}: ${exc instanceof Error ? exc.message : exc}`
-      )
-    }
-  }
+  mkdirSync(rootAbs, { recursive: true })
 
   const choice = product.choice
   if (!choice?.price?.trim()) {
     throw new Error('saveScrapedProductToDisk: choice with price is required')
   }
 
-  let choiceRel = ''
+  const galleryUrls = Array.isArray(product.gallery_image_urls) ? product.gallery_image_urls : []
+  const downloadedImages: Array<{ name: string; buffer: Buffer }> = []
+  for (let i = 0; i < galleryUrls.length; i++) {
+    const url = galleryUrls[i]
+    try {
+      const { buffer, contentType } = await downloadBinary(url)
+      const ext = extFromUrlOrType(url, contentType)
+      downloadedImages.push({ name: `${pad2(i + 1)}.${ext}`, buffer })
+    } catch (exc) {
+      jobLog(`save image fail #${i + 1}: ${exc instanceof Error ? exc.message : exc}`)
+    }
+  }
+
+  let choiceBuffer: { name: string; buffer: Buffer } | null = null
   if (choice.image_url) {
     try {
       const { buffer, contentType } = await downloadBinary(choice.image_url)
       const ext = extFromUrlOrType(choice.image_url, contentType)
-      const name = `01.${ext}`
-      writeFileSync(join(choicesDir, name), buffer)
-      choiceRel = `choices/${name}`
+      choiceBuffer = { name: `01.${ext}`, buffer }
     } catch (exc) {
-      jobLog(
-        `save choice image fail: ${exc instanceof Error ? exc.message : exc}`
-      )
+      jobLog(`save choice image fail: ${exc instanceof Error ? exc.message : exc}`)
     }
   }
 
-  const folderRel =
-    toRelativeFolder(cfg, folderAbs) || folderAbs.replace(/\\/g, '/')
+  let imageRels: string[] = []
+  let choiceRel = ''
+  let snapshotName = ''
+
+  // New snapshot only when this run downloaded at least one file.
+  if (downloadedImages.length > 0 || choiceBuffer) {
+    const prevActive = resolveActiveSnapshot(rootAbs)
+    const snapshotAbs = allocateSnapshotAbs(rootAbs)
+    snapshotName = snapshotAbs.slice(rootAbs.length).replace(/^[/\\]+/, '')
+    mkdirSync(snapshotAbs, { recursive: true })
+    const imagesDir = join(snapshotAbs, 'images')
+    const choicesDir = join(snapshotAbs, 'choices')
+    mkdirSync(imagesDir, { recursive: true })
+    mkdirSync(choicesDir, { recursive: true })
+
+    if (downloadedImages.length) {
+      for (const img of downloadedImages) {
+        writeFileSync(join(imagesDir, img.name), img.buffer)
+        imageRels.push(`images/${img.name}`)
+      }
+    } else if (prevActive) {
+      // Keep gallery on the new active stamp when only choice was re-downloaded.
+      imageRels = copyDirFiles(join(prevActive, 'images'), imagesDir).map((n) => `images/${n}`)
+    }
+
+    if (choiceBuffer) {
+      writeFileSync(join(choicesDir, choiceBuffer.name), choiceBuffer.buffer)
+      choiceRel = `choices/${choiceBuffer.name}`
+    } else if (prevActive) {
+      const copied = copyDirFiles(join(prevActive, 'choices'), choicesDir)
+      if (copied.length) choiceRel = `choices/${copied[0]}`
+    }
+  } else {
+    // No files downloaded — do not create a snapshot; keep prior choice path for price upsert.
+    const prevActive = resolveActiveSnapshot(rootAbs)
+    if (prevActive) {
+      const prior = listFiles(join(prevActive, 'choices'))
+      if (prior.length) choiceRel = `choices/${prior[0]}`
+    }
+  }
+
+  const folderRel = toRelativeFolder(cfg, rootAbs) || rootAbs.replace(/\\/g, '/')
 
   const saved: ScrapedProduct = {
     ...product,
@@ -175,36 +245,10 @@ export async function saveScrapedProductToDisk(
     }
   }
 
-  // Lightweight sidecar for debugging / re-import
-  try {
-    writeFileSync(
-      join(folderAbs, 'product.json'),
-      JSON.stringify(
-        {
-          platform: opts.platform,
-          product_id: saved.product_id,
-          title: saved.title,
-          url: saved.url,
-          description: saved.description,
-          rating: saved.rating,
-          review_count: saved.review_count,
-          seller_name: saved.seller_name ?? null,
-          seller_id: saved.seller_id ?? null,
-          store_url: saved.store_url ?? null,
-          specs: saved.specs ?? null,
-          local_files: saved.local_files
-        },
-        null,
-        2
-      ),
-      'utf8'
-    )
-  } catch {
-    /* ignore */
-  }
-
   jobLog(
-    `saved product folder=${folderRel} images=${imageRels.length} choice=${choiceRel || 'none'}`
+    `saved product folder=${folderRel}${reused ? ' (reused root)' : ''}` +
+      `${snapshotName ? ` snapshot=${snapshotName}` : ' (no snapshot)'}` +
+      ` images=${imageRels.length} choice=${choiceRel || 'none'}`
   )
 
   return { folder: folderRel, product: saved }

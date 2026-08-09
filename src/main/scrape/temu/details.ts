@@ -1,20 +1,6 @@
 import type { Page } from 'playwright'
-import { sleep } from './util'
 
-/** Expand collapsed "See all details" so specs are in the DOM. */
-export async function expandTemuProductDetails(page: Page): Promise<void> {
-  const btn = page.getByRole('button', { name: /see all details/i }).first()
-  try {
-    if (await btn.isVisible({ timeout: 2_000 })) {
-      await btn.click({ timeout: 5_000 })
-      await sleep(400)
-    }
-  } catch {
-    /* already expanded or missing */
-  }
-}
-
-/** Key/value rows under "Product details". */
+/** Key/value rows under "Product details" (visible DOM only; no Expand click). */
 export async function extractTemuSpecs(page: Page): Promise<Record<string, string>> {
   return page.evaluate(() => {
     const bodyText = document.body?.innerText || ''
