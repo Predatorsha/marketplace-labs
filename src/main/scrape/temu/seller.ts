@@ -22,24 +22,6 @@ export async function extractTemuSellerName(page: Page): Promise<string | null> 
       if (name) return name
     }
 
-    const soldBy = document.querySelector('a[aria-label^="Sold by" i]')
-    const aria = soldBy?.getAttribute('aria-label') || ''
-    const soldMatch = aria.match(/^Sold by\s+(.+)$/i)
-    if (soldMatch) return soldMatch[1].trim()
-
-    const nearShop = Array.from(document.querySelectorAll('[role="link"][aria-label]')).find(
-      (el) => {
-        const label = (el.getAttribute('aria-label') || '').trim()
-        if (!label || /shop all|sold by|follow|avatar/i.test(label)) return false
-        const blockText = (el.closest('section, article, div')?.textContent || '').slice(0, 500)
-        return /followers|shop all items|started to sell/i.test(blockText)
-      }
-    )
-    if (nearShop) {
-      const label = (nearShop.getAttribute('aria-label') || '').trim()
-      if (label) return label
-    }
-
     return null
   })
 }
@@ -76,29 +58,11 @@ async function queryStoreAvatar(
   return null
 }
 
-/**
- * Store icon: `#main_scale > div.mainContent a[href*="mall.html"]` (with img).
- * Light scroll only — a few short steps, not a full-page crawl.
- */
+/** Store icon: `#main_scale > div.mainContent a[href*="mall.html"]` (with img). */
 async function findTemuStoreAvatar(
   page: Page
 ): Promise<ElementHandle<HTMLAnchorElement> | null> {
-  const found = await queryStoreAvatar(page)
-  if (found) return found
-
-  for (let i = 0; i < 4; i++) {
-    const atBottom = await page.evaluate(() => {
-      const max = document.documentElement.scrollHeight - window.innerHeight
-      if (window.scrollY >= max - 8) return true
-      window.scrollBy(0, Math.floor(window.innerHeight * 0.4))
-      return false
-    })
-    await sleep(250)
-    const again = await queryStoreAvatar(page)
-    if (again) return again
-    if (atBottom) break
-  }
-  return null
+  return queryStoreAvatar(page)
 }
 
 /**

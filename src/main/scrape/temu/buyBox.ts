@@ -10,45 +10,43 @@ export async function extractTemuTitle(page: Page): Promise<string | null> {
         return t
       }
     }
-
-    const bodyText = document.body?.innerText || ''
-    const m = bodyText.match(/(?:Est\.?\s*[\d.,]+\s*[€$£][^\n]*)\n+([^\n]{30,400})/i)
-    return m ? m[1].replace(/\s+/g, ' ').trim() : null
+    return null
   })
 }
 
-/**
- * Raw price text from the buy box.
- * Prefer Est. …; else first currency amount (skip RRP). Left unchanged on purpose.
- */
+/** Raw price text from the buy box (`Est. …`). */
 export async function extractTemuPriceRaw(page: Page): Promise<string | null> {
   return page.evaluate(() => {
     const bodyText = document.body?.innerText || ''
     const estMatch = bodyText.match(/Est\.?\s*([€$£]?\s*[\d.,]+\s*[€$£]?)/i)
-    if (estMatch) return `Est. ${estMatch[1].trim()}`
-
-    const withoutRrp = bodyText.replace(/\bRRP\b[^\n]*/gi, ' ')
-    const buy = withoutRrp.match(/([€$£]\s*[\d.,]+|[\d.,]+\s*[€$£])/)
-    return buy ? buy[1].trim() : null
+    return estMatch ? `Est. ${estMatch[1].trim()}` : null
   })
 }
 
+/**
+ * Product rating/reviews live in `#reviewContent` only.
+ * Missing block → no product reviews (store rating must not be used).
+ */
 export async function extractTemuReviews(
   page: Page
 ): Promise<{ reviewCount: string | null; rating: string | null }> {
   return page.evaluate(() => {
-    const bodyText = document.body?.innerText || ''
-    let reviewCount: string | null = null
+    const root = document.querySelector('#reviewContent')
+    if (!root) return { reviewCount: '0', rating: null }
+
+    const text = (root as HTMLElement).innerText || ''
+    let reviewCount = '0'
+    const rev = text.match(/([\d.,\s]+)\s*reviews?\b/i)
+    if (rev) {
+      const digits = rev[1].replace(/[^\d]/g, '')
+      if (digits) reviewCount = digits
+    }
+
     let rating: string | null = null
-
-    const rev = bodyText.match(/([\d.,\s]+)\s*reviews?\b/i)
-    if (rev) reviewCount = rev[1].replace(/[^\d]/g, '')
-
-    const rate = bodyText.match(/\breviews?\b[^\d]{0,40}(\d([.,]\d)?)\b/i)
-    if (rate) rating = rate[1].replace(',', '.')
-    if (!rating) {
-      const rate2 = bodyText.match(/\b(\d[.,]\d)\s*(?:\/\s*5)?\s*(?:stars?)?/i)
-      if (rate2) rating = rate2[1].replace(',', '.')
+    const rate = text.match(/\b(\d(?:[.,]\d)?)\s*(?:\/\s*5)?\b/)
+    if (rate) {
+      const n = Number(rate[1].replace(',', '.'))
+      if (Number.isFinite(n) && n >= 0 && n <= 5) rating = String(n)
     }
 
     return { reviewCount, rating }

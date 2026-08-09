@@ -63,13 +63,11 @@ Priorities: **P1** user/data breakers, **P2** wrong data or unfinished wiring, *
 
 ---
 
-### P2-4 — `resolveGoodsId` ignores path `g-{id}`
+### P2-4 — `resolveGoodsId` ignores path `g-{id}` — DONE
 
-**Where:** `src/main/scrape/temu/product.ts` — `resolveGoodsId` (~13–21).
+**Where:** was `src/main/scrape/temu/product.ts` — `resolveGoodsId`; `src/main/scrape/url.ts` — `extractTemuGoodsId`.
 
-**What:** Only reads `goods_id` / `goodsId` query params. Temu pretty URLs often use `-g-6011….html` with no query. After redirect, scraper keeps provisional `opts.productId`. Wrong id written to disk/DB → later re-downloads won’t match real goods.
-
-**Fix direction:** Parse `-g-(\d+)` (and similar) from pathname; prefer final URL over provisional id.
+**Resolution:** Temu id is taken once from original URL pathname (`-g-{digits}`) in `parseProductUrl`. `resolveGoodsId` removed; scrape always uses `opts.productId` (disk/DB unchanged). Query / fallback extractors deleted.
 
 ---
 

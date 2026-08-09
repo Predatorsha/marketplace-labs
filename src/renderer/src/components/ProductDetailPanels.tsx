@@ -211,11 +211,11 @@ export default function ProductDetailPanels({
 
           {!hasProduct ? <div className="info-placeholder">{emptyInfoText}</div> : null}
 
-          {hasProduct && (product?.rating || product?.review_count) ? (
+          {hasProduct && product?.rating ? (
             <div className="info-rating-row">
               <StarRatingDisplay
-                rating={product?.rating}
-                reviewCount={product?.review_count}
+                rating={product.rating}
+                reviewCount={product.review_count}
                 size="md"
               />
             </div>

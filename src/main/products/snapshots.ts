@@ -55,6 +55,13 @@ export function listSnapshotDirs(productRootAbs: string): string[] {
   }
 }
 
+/** Latest dated snapshot under the product root (by folder name), or null. */
+export function resolveLatestSnapshot(productRootAbs: string): string | null {
+  const names = listSnapshotDirs(productRootAbs)
+  if (!names.length) return null
+  return join(productRootAbs, names[names.length - 1])
+}
+
 /**
  * Latest non-empty snapshot under the product root, or null if none.
  * Media paths (images/, choices/) are resolved relative to this folder.

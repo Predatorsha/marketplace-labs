@@ -10,14 +10,13 @@ export function imageDedupeKey(url: string): string {
 
 /**
  * Prefer a larger CDN variant.
- * Strip imageView2 resize when present (preview often still carries w/70–800);
- * otherwise bump explicit w/h params.
+ * Strip imageView2 resize when present (preview often still carries w/70–800).
  */
 export function upgradeTemuImageUrl(url: string): string {
-  let out = url.trim()
+  const out = url.trim()
   if (!out) return out
   // img.kwcdn.com?...imageView2/2/w/70/... → drop transform, keep original asset
-  if (/[?&]imageView2\//i.test(out) || /[?&]imageMogr2\//i.test(out)) {
+  if (/[?&]imageView2\//i.test(out)) {
     try {
       const u = new URL(out)
       u.search = ''
@@ -26,7 +25,5 @@ export function upgradeTemuImageUrl(url: string): string {
       return out.split('?')[0]
     }
   }
-  out = out.replace(/\/w\/\d+/gi, '/w/1400').replace(/\/h\/\d+/gi, '/h/1400')
-  out = out.replace(/([?&])width=\d+/gi, '$1width=1400').replace(/([?&])height=\d+/gi, '$1height=1400')
   return out
 }

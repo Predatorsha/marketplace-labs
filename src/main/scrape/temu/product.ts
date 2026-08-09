@@ -9,17 +9,6 @@ import { sleep } from './util'
 
 export { upgradeTemuImageUrl } from './images'
 
-function resolveGoodsId(pageUrl: string, fallback: string): string {
-  try {
-    const finalUrl = new URL(pageUrl)
-    const gid = finalUrl.searchParams.get('goods_id') || finalUrl.searchParams.get('goodsId')
-    if (gid && /^\d+$/.test(gid)) return gid
-  } catch {
-    /* keep fallback */
-  }
-  return fallback
-}
-
 /**
  * Scrape a Temu product page (single-choice / no variant picker case).
  * Navigates, waits for login gate if needed, extracts fields from the first screen.
@@ -57,7 +46,7 @@ export async function scrapeTemuProductPage(
 
   if (await isTemuProductUnavailable(page)) {
     return {
-      product_id: resolveGoodsId(page.url(), opts.productId),
+      product_id: opts.productId,
       url: page.url() || opts.url,
       status: 'archived'
     }
@@ -81,7 +70,8 @@ export async function scrapeTemuProductPage(
     throw new Error('temu: product title/description not found')
   }
 
-  // Single-choice: last saved frame → Choice; the rest → images/.
+  // Single-choice: Temu last frame → Choice; the rest → images/.
+  // Gallery must already be rail order (first→last); see collectTemuGalleryUrls.
   // Drop Choice URL from images when the gallery also contained it.
   const choiceUrl = gallery[gallery.length - 1]
   const choiceKey = imageDedupeKey(choiceUrl)
@@ -89,14 +79,13 @@ export async function scrapeTemuProductPage(
     .slice(0, -1)
     .filter((u) => imageDedupeKey(u) !== choiceKey)
 
-  const productId = resolveGoodsId(page.url(), opts.productId)
   const specs =
     dom.specs && Object.keys(dom.specs).length > 0 ? { ...dom.specs } : undefined
 
   const productPageUrl = page.url() || opts.url
 
   return {
-    product_id: productId,
+    product_id: opts.productId,
     url: productPageUrl,
     title: text,
     description: text,

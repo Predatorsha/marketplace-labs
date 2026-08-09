@@ -3,13 +3,10 @@ import type { Page } from 'playwright'
 /** Key/value rows under "Product details" (visible DOM only; no Expand click). */
 export async function extractTemuSpecs(page: Page): Promise<Record<string, string>> {
   return page.evaluate(() => {
-    const bodyText = document.body?.innerText || ''
     const specs: Record<string, string> = {}
     const stopRe =
       /^(free shipping|sold by|add to cart|lightning deal|color:|qty|explore your interests|why choose temu|delivery:|courier company)/i
     const skipKeys = /^(save|report this item|copy|see all details|product details)$/i
-    const knownLabels =
-      /^(operation instruction|style|main material|printing type|composition|item id|origin|material|pattern|brand|care|season|gender|occasion)$/i
 
     function addSpec(key: string, value: string): void {
       const k = key.replace(/\s+/g, ' ').replace(/:$/, '').trim()
@@ -24,12 +21,6 @@ export async function extractTemuSpecs(page: Page): Promise<Record<string, strin
         if (i > 0 && stopRe.test(line)) break
         if (/^product details$/i.test(line) || skipKeys.test(line)) continue
 
-        const colon = line.match(/^([^:]{2,80}):\s*(.+)$/)
-        if (colon) {
-          addSpec(colon[1], colon[2])
-          continue
-        }
-
         const next = lines[i + 1]
         if (
           !next ||
@@ -43,9 +34,8 @@ export async function extractTemuSpecs(page: Page): Promise<Record<string, strin
         }
 
         const looksLikeLabel =
-          knownLabels.test(line) ||
-          (/^[A-Z][A-Za-z0-9 /&+-]{1,40}$/.test(line) &&
-            !/^(free|sold|add|color|qty|women|men)/i.test(line))
+          /^[A-Z][A-Za-z0-9 /&+-]{1,40}$/.test(line) &&
+          !/^(free|sold|add|color|qty|women|men)/i.test(line)
 
         if (looksLikeLabel) {
           addSpec(line, next)
@@ -74,18 +64,6 @@ export async function extractTemuSpecs(page: Page): Promise<Record<string, strin
           .map((s) => s.trim())
           .filter(Boolean)
         parseLines(chunk)
-      }
-    }
-
-    if (!Object.keys(specs).length) {
-      const idx = bodyText.search(/product details/i)
-      if (idx >= 0) {
-        const lines = bodyText
-          .slice(idx, idx + 3000)
-          .split(/\n+/)
-          .map((s) => s.trim())
-          .filter(Boolean)
-        parseLines(lines)
       }
     }
 

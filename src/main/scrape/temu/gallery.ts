@@ -19,15 +19,6 @@ function galleryKey(url: string): string {
  */
 async function readPreviewSrc(page: Page): Promise<string | null> {
   return page.evaluate(() => {
-    function imgSrc(img: HTMLImageElement): string {
-      return (
-        img.currentSrc ||
-        img.src ||
-        img.getAttribute('data-src') ||
-        img.getAttribute('data-origin') ||
-        ''
-      )
-    }
     function junk(src: string): boolean {
       return (
         !src ||
@@ -51,7 +42,7 @@ async function readPreviewSrc(page: Page): Promise<string | null> {
       if (rect.right < 80 || rect.left > window.innerWidth - 40) continue
       // Prefer the centered slide; ignore mostly off-screen carousel neighbors.
       if (rect.left < -40 || rect.right > window.innerWidth + 40) continue
-      const src = imgSrc(img)
+      const src = img.currentSrc || ''
       if (junk(src)) continue
       const a = rect.width * rect.height
       if (a > area) {
@@ -80,6 +71,25 @@ async function focusLightbox(page: Page): Promise<void> {
     if (!dialog.hasAttribute('tabindex')) dialog.setAttribute('tabindex', '-1')
     dialog.focus()
   })
+}
+
+/** First left-rail thumb src (Temu gallery index 0). Used to un-rotate after open-at-2nd. */
+async function readFirstRailThumbSrc(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const li = document.querySelector('#leftContent ol > li:nth-child(1)')
+    if (!(li instanceof HTMLElement)) return null
+    const img = li.querySelector('img')
+    if (!(img instanceof HTMLImageElement)) return null
+    return img.currentSrc || null
+  })
+}
+
+/** Rotate so `anchorKey` is first; no-op if missing or already first. */
+function rotateGalleryToAnchor(urls: string[], anchorKey: string): string[] {
+  if (!anchorKey || urls.length < 2) return urls
+  const idx = urls.findIndex((u) => galleryKey(u) === anchorKey)
+  if (idx <= 0) return urls
+  return urls.slice(idx).concat(urls.slice(0, idx))
 }
 
 async function openLightbox(page: Page): Promise<boolean> {
@@ -165,10 +175,19 @@ async function closeLightbox(page: Page): Promise<void> {
 
 /**
  * Lightbox gallery: open via left-rail 2nd thumb, step with ArrowRight, stop
- * when the current frame matches the first (loop). Loop frame is not kept.
+ * when the current frame matches the first collected (loop). Loop frame is not
+ * kept. Rotate back to Temu order using the 1st rail thumb (open starts at 2nd,
+ * so without rotate the real last frame is not last — Choice would be wrong).
  * Close via Escape.
  */
 export async function collectTemuGalleryUrls(page: Page): Promise<string[]> {
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await sleep(150)
+
+  // Anchor = true gallery[0] before lightbox (2nd-thumb open shifts the start).
+  const anchorRaw = await readFirstRailThumbSrc(page)
+  const anchorKey = anchorRaw ? galleryKey(upgradeTemuImageUrl(anchorRaw)) : ''
+
   await openLightbox(page)
 
   const firstRaw = await readPreviewSrc(page)
@@ -197,5 +216,5 @@ export async function collectTemuGalleryUrls(page: Page): Promise<string[]> {
   }
 
   await closeLightbox(page)
-  return urls
+  return rotateGalleryToAnchor(urls, anchorKey)
 }

@@ -1,6 +1,7 @@
 import { ipcMain, shell } from 'electron'
 import { fromRelativeFolder } from '../../core/paths'
 import { loadConfig } from '../../config'
+import { resolveLatestSnapshot } from '../../products/snapshots'
 
 export function registerShellHandlers(): void {
   ipcMain.handle('shell:openPath', async (_evt, args: { path: string }) => {
@@ -11,7 +12,9 @@ export function registerShellHandlers(): void {
     if (!abs) {
       return { ok: false, error: 'Path is outside the catalog root folder' }
     }
-    const err = await shell.openPath(abs)
+    // Product roots hold dated snapshots; open the newest one when present.
+    const target = resolveLatestSnapshot(abs) || abs
+    const err = await shell.openPath(target)
     if (err) return { ok: false, error: err }
     return { ok: true }
   })
