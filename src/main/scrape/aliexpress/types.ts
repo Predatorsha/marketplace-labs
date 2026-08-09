@@ -1,0 +1,17 @@
+import type { AliChoiceOption } from './choices'
+
+/** Fields pulled from the AliExpress product DOM (pre-normalization). */
+export type AliDomExtract = {
+  title: string | null
+  priceRaw: string | null
+  rating: string | null
+  reviewCount: string | null
+  sold: string | null
+  /** Main slider photos (full-size); trailing ones duplicate SKU images. */
+  sliderImages: string[]
+  /** Description-block photos (shadow DOM) — the primary product gallery. */
+  descriptionImages: string[]
+  specs: Record<string, string>
+  /** SKU variants of the first property, [] when the page has no picker. */
+  choiceOptions: AliChoiceOption[]
+}

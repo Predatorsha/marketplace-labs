@@ -1,5 +1,6 @@
 import type { Page } from 'playwright'
 import type { MarketplacePlatform } from './url'
+import { scrapeAliExpressProductPage } from './aliexpress/product'
 import { scrapeTemuProductPage } from './temu/product'
 
 /**
@@ -62,6 +63,9 @@ export async function scrapeProductPage(
 ): Promise<ScrapedProduct> {
   if (opts.platform === 'temu') {
     return scrapeTemuProductPage(page, { url: opts.url, productId: opts.productId })
+  }
+  if (opts.platform === 'aliexpress') {
+    return scrapeAliExpressProductPage(page, { url: opts.url, productId: opts.productId })
   }
   throw new Error(`scrapeProductPage: platform "${opts.platform}" is not implemented yet`)
 }

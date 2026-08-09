@@ -54,19 +54,22 @@ function extFromContentType(contentType: string | null): string {
   const ct = (contentType || '').toLowerCase()
   if (ct.includes('png')) return 'png'
   if (ct.includes('webp')) return 'webp'
+  if (ct.includes('avif')) return 'avif'
   if (ct.includes('gif')) return 'gif'
   return 'jpg'
 }
 
 async function downloadBinary(
-  url: string
+  url: string,
+  referer: string
 ): Promise<{ buffer: Buffer; contentType: string | null }> {
   const res = await fetch(url, {
     headers: {
       'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-      Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-      Referer: 'https://www.temu.com/'
+      // No avif: prefer formats viewers open everywhere; ext still follows content-type.
+      Accept: 'image/webp,image/apng,image/*,*/*;q=0.8',
+      Referer: referer
     }
   })
   if (!res.ok) {
@@ -137,6 +140,8 @@ export async function saveScrapedProductToDisk(
   opts: {
     platform: MarketplacePlatform
     product: ScrapedProduct
+    /** Referer header for image downloads (marketplace-specific, passed by the scrape router). */
+    imageReferer: string
   }
 ): Promise<SavedProductOnDisk> {
   const product = { ...opts.product }
@@ -160,7 +165,7 @@ export async function saveScrapedProductToDisk(
   const downloadedImages: Array<{ name: string; buffer: Buffer }> = []
   for (let i = 0; i < galleryUrls.length; i++) {
     try {
-      const { buffer, contentType } = await downloadBinary(galleryUrls[i])
+      const { buffer, contentType } = await downloadBinary(galleryUrls[i], opts.imageReferer)
       downloadedImages.push({ name: `${pad2(i + 1)}.${extFromContentType(contentType)}`, buffer })
     } catch (exc) {
       jobLog(`save image fail #${i + 1}: ${exc instanceof Error ? exc.message : exc}`)
@@ -176,7 +181,7 @@ export async function saveScrapedProductToDisk(
       continue
     }
     try {
-      const { buffer, contentType } = await downloadBinary(url)
+      const { buffer, contentType } = await downloadBinary(url, opts.imageReferer)
       choiceBuffers.push({ name: `${pad2(i + 1)}.${extFromContentType(contentType)}`, buffer })
     } catch (exc) {
       jobLog(`save choice image fail #${i + 1}: ${exc instanceof Error ? exc.message : exc}`)

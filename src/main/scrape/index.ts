@@ -4,7 +4,9 @@ import { applyProductMarketplaceStatus, upsertProductFromSaved } from '../code/p
 import { jobLog } from '../jobs/log'
 import { saveScrapedProductToDisk } from '../products/files'
 import type { ProductDownloadResult } from '../../shared/types'
+import { ALIEXPRESS_IMAGE_REFERER } from './aliexpress/product'
 import { scrapeProductPage } from './product'
+import { TEMU_IMAGE_REFERER } from './temu/product'
 import { resolveTemuSellerStore } from './temu/seller'
 import { parseProductUrl } from './url'
 
@@ -12,7 +14,7 @@ import { parseProductUrl } from './url'
  * Single product-scrape entry point.
  *
  * Flow: scrape PDP fields → gallery photos → save to disk → (Temu) store same-tab
- * → upsert DB → close browser. AliExpress / multi-choice TBD.
+ * → upsert DB → close browser.
  */
 export async function scrapeProduct(
   cfg: AppConfig,
@@ -67,7 +69,9 @@ export async function scrapeProduct(
         // Fields + gallery already scraped; download photos to disk.
         const saved = await saveScrapedProductToDisk(cfg, {
           platform: parsed.platform,
-          product: scraped
+          product: scraped,
+          imageReferer:
+            parsed.platform === 'temu' ? TEMU_IMAGE_REFERER : ALIEXPRESS_IMAGE_REFERER
         })
 
         // Temu: click store icon in the same tab, capture store_url + mall_id.

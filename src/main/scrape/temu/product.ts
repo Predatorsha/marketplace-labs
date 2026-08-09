@@ -6,6 +6,9 @@ import { isTemuProductUnavailable } from './availability'
 import { extractTemuDom } from './extract'
 import { sleep } from './util'
 
+/** Referer for downloading Temu CDN images outside the browser. */
+export const TEMU_IMAGE_REFERER = 'https://www.temu.com/'
+
 /**
  * Scrape a Temu product page: fields, gallery, and all buy-box choices.
  * Navigates, waits for login gate if needed, extracts fields from the first screen.
