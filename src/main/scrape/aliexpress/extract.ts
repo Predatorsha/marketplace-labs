@@ -1,7 +1,7 @@
 import type { Page } from 'playwright'
 import { extractAliPriceRaw, extractAliReviews, extractAliTitle } from './buyBox'
 import { collectAliChoiceOptions } from './choices'
-import { collectAliDescriptionImages, collectAliSliderImages } from './gallery'
+import { collectAliDescriptionImages, collectAliSliderImages, collectAliVideo } from './gallery'
 import { extractAliSeller } from './seller'
 import { extractAliSpecs } from './specs'
 import type { AliDomExtract } from './types'
@@ -34,6 +34,7 @@ export async function extractAliDom(page: Page): Promise<AliDomExtract> {
   const priceRaw = await extractAliPriceRaw(page)
   const reviews = await extractAliReviews(page)
   const sliderImages = await collectAliSliderImages(page)
+  const videoUrl = await collectAliVideo(page)
 
   await scrollForLazySections(page)
   const specs = await extractAliSpecs(page)
@@ -50,6 +51,7 @@ export async function extractAliDom(page: Page): Promise<AliDomExtract> {
     sold: reviews.sold,
     sliderImages,
     descriptionImages,
+    videoUrl,
     specs,
     sellerName: seller.sellerName,
     storeUrl: seller.storeUrl,

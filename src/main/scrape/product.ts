@@ -44,6 +44,8 @@ export type ScrapedProduct = {
   /** Filled after save-to-disk (relative paths under the product folder). */
   local_files?: {
     images?: string[]
+    /** Gallery video file, when the PDP had one (`video/01.mp4`). */
+    video?: string | null
     choices?: Array<{
       file: string
       name?: string | null

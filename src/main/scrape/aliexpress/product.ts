@@ -97,6 +97,7 @@ export async function scrapeAliExpressProductPage(
     seller_name: dom.sellerName,
     seller_id: dom.sellerId,
     store_url: dom.storeUrl,
+    video: dom.videoUrl,
     specs,
     gallery_image_urls: images,
     choices: choiceDrafts

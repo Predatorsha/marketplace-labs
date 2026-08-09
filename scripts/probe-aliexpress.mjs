@@ -72,6 +72,35 @@ const slider = await page.evaluate(() =>
 console.log(`slider: ${slider.length} imgs`)
 slider.forEach((s) => console.log('  ', fullSize(s)))
 
+// --- gallery video (optional slide with videoIcon overlay) ---
+const videoSlide = page.locator(
+  '[class*="slider--item--"]:has([class*="slider--videoIcon--"])'
+)
+if (await videoSlide.count()) {
+  await videoSlide.first().click({ timeout: 5000 }).catch(() => undefined)
+  await page
+    .waitForFunction(
+      () => {
+        const v = document.querySelector('video')
+        return !!(v && (v.currentSrc || v.src || v.querySelector('source')?.src))
+      },
+      { timeout: 10_000 }
+    )
+    .catch(() => console.log('WARN: video src did not appear in 10s'))
+  const videoSrc = await page.evaluate(() => {
+    const v = document.querySelector('video')
+    return v?.currentSrc || v?.src || v?.querySelector('source')?.getAttribute('src') || null
+  })
+  console.log('video:', videoSrc)
+  await page
+    .locator('[class*="slider--item--"]:not(:has([class*="slider--videoIcon--"]))')
+    .first()
+    .click({ timeout: 3000 })
+    .catch(() => undefined)
+} else {
+  console.log('video: none')
+}
+
 // --- sku options ---
 const sku = await page.evaluate(() => {
   const props = Array.from(

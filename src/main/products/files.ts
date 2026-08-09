@@ -50,6 +50,13 @@ function allocateSnapshotAbs(productRootAbs: string): string {
   return join(productRootAbs, formatSnapshotDirName())
 }
 
+function videoExtFromContentType(contentType: string | null): string {
+  const ct = (contentType || '').toLowerCase()
+  if (ct.includes('webm')) return 'webm'
+  if (ct.includes('quicktime')) return 'mov'
+  return 'mp4'
+}
+
 function extFromContentType(contentType: string | null): string {
   const ct = (contentType || '').toLowerCase()
   if (ct.includes('png')) return 'png'
@@ -190,12 +197,28 @@ export async function saveScrapedProductToDisk(
   }
   const anyChoiceDownloaded = choiceBuffers.some(Boolean)
 
+  // Gallery video (single file); the remote URL stays in product.video for the DB.
+  let videoDownload: { name: string; buffer: Buffer } | null = null
+  const videoUrl =
+    typeof product.video === 'string' && /^https?:\/\//.test(product.video)
+      ? product.video
+      : null
+  if (videoUrl) {
+    try {
+      const { buffer, contentType } = await downloadBinary(videoUrl, opts.imageReferer)
+      videoDownload = { name: `01.${videoExtFromContentType(contentType)}`, buffer }
+    } catch (exc) {
+      jobLog(`save video fail: ${exc instanceof Error ? exc.message : exc}`)
+    }
+  }
+
   let imageRels: string[] = []
   const choiceRels: string[] = choices.map(() => '')
+  let videoRel: string | null = null
   let snapshotName = ''
 
   // New snapshot only when this run downloaded at least one file.
-  if (downloadedImages.length > 0 || anyChoiceDownloaded) {
+  if (downloadedImages.length > 0 || anyChoiceDownloaded || videoDownload) {
     const prevActive = resolveActiveSnapshot(rootAbs)
     const snapshotAbs = allocateSnapshotAbs(rootAbs)
     snapshotName = snapshotAbs.slice(rootAbs.length).replace(/^[/\\]+/, '')
@@ -229,6 +252,17 @@ export async function saveScrapedProductToDisk(
         if (i < choiceRels.length) choiceRels[i] = `choices/${n}`
       })
     }
+
+    if (videoDownload) {
+      const videoDir = join(snapshotAbs, 'video')
+      mkdirSync(videoDir, { recursive: true })
+      writeFileSync(join(videoDir, videoDownload.name), videoDownload.buffer)
+      videoRel = `video/${videoDownload.name}`
+    } else if (prevActive) {
+      // Keep the prior video on the new active stamp.
+      const copied = copyDirFiles(join(prevActive, 'video'), join(snapshotAbs, 'video'))
+      if (copied.length) videoRel = `video/${copied[0]}`
+    }
   } else {
     // No files downloaded — do not create a snapshot; keep prior choice paths for price upsert.
     const prevActive = resolveActiveSnapshot(rootAbs)
@@ -236,6 +270,8 @@ export async function saveScrapedProductToDisk(
       listFiles(join(prevActive, 'choices')).forEach((n, i) => {
         if (i < choiceRels.length) choiceRels[i] = `choices/${n}`
       })
+      const prevVideo = listFiles(join(prevActive, 'video'))
+      if (prevVideo.length) videoRel = `video/${prevVideo[0]}`
     }
   }
 
@@ -247,6 +283,7 @@ export async function saveScrapedProductToDisk(
     choices: undefined,
     local_files: {
       images: imageRels,
+      video: videoRel,
       choices: choices.map((c, i) => ({
         file: choiceRels[i],
         name: c.name ?? null,
@@ -259,7 +296,8 @@ export async function saveScrapedProductToDisk(
   jobLog(
     `saved product folder=${folderRel}${reused ? ' (reused root)' : ''}` +
       `${snapshotName ? ` snapshot=${snapshotName}` : ' (no snapshot)'}` +
-      ` images=${imageRels.length} choices=${choiceRels.filter(Boolean).length}/${choices.length}`
+      ` images=${imageRels.length} choices=${choiceRels.filter(Boolean).length}/${choices.length}` +
+      `${videoRel ? ' video=1' : ''}`
   )
 
   return { folder: folderRel, product: saved }

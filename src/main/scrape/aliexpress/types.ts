@@ -11,6 +11,8 @@ export type AliDomExtract = {
   sliderImages: string[]
   /** Description-block photos (shadow DOM) — the primary product gallery. */
   descriptionImages: string[]
+  /** Direct gallery video URL (mp4), null when the slider has no video slide. */
+  videoUrl: string | null
   specs: Record<string, string>
   sellerName: string | null
   storeUrl: string | null
