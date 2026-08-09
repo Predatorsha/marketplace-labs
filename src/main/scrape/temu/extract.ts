@@ -6,7 +6,7 @@ import {
   extractTemuTitle
 } from './buyBox'
 import { extractTemuSpecs } from './details'
-import { collectTemuGalleryUrls } from './gallery'
+import { collectTemuGallery } from './gallery'
 import { extractTemuSellerName } from './seller'
 import type { TemuDomExtract } from './types'
 
@@ -18,7 +18,7 @@ export async function extractTemuDom(page: Page): Promise<TemuDomExtract> {
   const option = await extractTemuOption(page)
   const sellerName = await extractTemuSellerName(page)
   const specs = await extractTemuSpecs(page)
-  const gallery = await collectTemuGalleryUrls(page)
+  const gallery = await collectTemuGallery(page)
 
   return {
     title,

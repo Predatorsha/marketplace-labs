@@ -4,7 +4,6 @@ import { normalizeDisplayPrice } from '../price'
 import type { ScrapedProduct } from '../product'
 import { isTemuProductUnavailable } from './availability'
 import { extractTemuDom } from './extract'
-import { imageDedupeKey } from './images'
 import { sleep } from './util'
 
 /**
@@ -51,9 +50,8 @@ export async function scrapeTemuProductPage(
   }
 
   const dom = await extractTemuDom(page)
-  // Gallery URLs are already upgraded and validated by collectTemuGalleryUrls.
-  const gallery = dom.gallery || []
-  if (gallery.length < 1) {
+  const { images, choices } = dom.gallery
+  if (images.length + choices.length < 1) {
     throw new Error('temu: no gallery images found on product page')
   }
 
@@ -67,14 +65,10 @@ export async function scrapeTemuProductPage(
     throw new Error('temu: product title/description not found')
   }
 
-  // Single-choice: Temu last frame → Choice; the rest → images/.
-  // Gallery must already be rail order (first→last); see collectTemuGalleryUrls.
-  // Drop Choice URL from images when the gallery also contained it.
-  const choiceUrl = gallery[gallery.length - 1]
-  const choiceKey = imageDedupeKey(choiceUrl)
-  const imageUrls = gallery
-    .slice(0, -1)
-    .filter((u) => imageDedupeKey(u) !== choiceKey)
+  // Rail is already split: leading photos → images/, trailing (radio count) → Choice.
+  // No variant radios on the page → treat the last photo as Choice.
+  const choiceUrl = choices[0] ?? images[images.length - 1]
+  const imageUrls = choices.length > 0 ? images : images.slice(0, -1)
 
   const specs =
     dom.specs && Object.keys(dom.specs).length > 0 ? { ...dom.specs } : undefined

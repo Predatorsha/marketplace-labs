@@ -1,3 +1,5 @@
+import type { TemuGallery } from './gallery'
+
 /** Fields pulled from the Temu product DOM (pre-normalization). */
 export type TemuDomExtract = {
   title: string | null
@@ -6,7 +8,7 @@ export type TemuDomExtract = {
   rating: string | null
   optionGroup: string | null
   optionName: string | null
-  gallery: string[]
+  gallery: TemuGallery
   specs: Record<string, string>
   sellerName: string | null
 }
