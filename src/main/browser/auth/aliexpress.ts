@@ -5,6 +5,15 @@ import { sleep } from './util'
 
 async function aliexpressNeedsLogin(page: Page): Promise<boolean> {
   return page.evaluate(() => {
+    // Header account menu: logged out it reads "Sign in / Register" (hashed
+    // class suffixes, so match by prefix), logged in — the account name.
+    const account = document.querySelector<HTMLElement>(
+      'div[class*="my-account--menuItem"], div[class*="my-account--"] [class*="my-account--text"]'
+    )
+    if (account && /sign\s*in|register|войти|регистрац/i.test(account.innerText || '')) {
+      return true
+    }
+
     const body = (document.body?.innerText || '').slice(0, 12_000)
     if (/sign in|join|login/i.test(body) && /password/i.test(body)) {
       const dialogs = document.querySelectorAll('[role="dialog"], .login-dialog, #login')
@@ -58,10 +67,16 @@ export async function ensureAliExpressLoggedIn(page: Page, opts?: AuthGateOpts):
       kind: 'login',
       platform: 'aliexpress',
       message:
-        'AliExpress: войдите в аккаунт в окне браузера, затем нажмите «Продолжить».'
+        'AliExpress: нажмите Sign in / Register и войдите в аккаунт, затем «Продолжить». Пока вход не завершён — дальше не идём.'
     })
     if (action === 'cancel') throw new Error('aliexpress: login gate cancelled')
     await sleep(1000)
+    // Login often happens in a modal — the header can keep showing
+    // "Sign in / Register" until a reload, which would re-open the gate forever.
+    if (await aliexpressNeedsLogin(page).catch(() => false)) {
+      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {})
+      await sleep(1500)
+    }
   }
 
   throw new Error('aliexpress: login / captcha gate timed out')
