@@ -1,13 +1,13 @@
 import type { Page } from 'playwright'
 import { ensureTemuLoggedIn } from '../../browser/auth/temu'
 import { normalizeDisplayPrice } from '../price'
-import type { ScrapedProduct } from '../product'
+import type { ScrapedChoiceDraft, ScrapedProduct } from '../product'
 import { isTemuProductUnavailable } from './availability'
 import { extractTemuDom } from './extract'
 import { sleep } from './util'
 
 /**
- * Scrape a Temu product page (single-choice / no variant picker case).
+ * Scrape a Temu product page: fields, gallery, and all buy-box choices.
  * Navigates, waits for login gate if needed, extracts fields from the first screen.
  * Unavailable listings return `status: 'archived'` without gallery/price (caller updates DB only).
  */
@@ -50,8 +50,8 @@ export async function scrapeTemuProductPage(
   }
 
   const dom = await extractTemuDom(page)
-  const { images, choices } = dom.gallery
-  if (images.length + choices.length < 1) {
+  const { images, choices: choicePhotos } = dom.gallery
+  if (images.length + choicePhotos.length < 1) {
     throw new Error('temu: no gallery images found on product page')
   }
 
@@ -65,10 +65,29 @@ export async function scrapeTemuProductPage(
     throw new Error('temu: product title/description not found')
   }
 
-  // Rail is already split: leading photos → images/, trailing (radio count) → Choice.
-  // No variant radios on the page → treat the last photo as Choice.
-  const choiceUrl = choices[0] ?? images[images.length - 1]
-  const imageUrls = choices.length > 0 ? images : images.slice(0, -1)
+  // One choice per buy-box radio, photo paired by index with the trailing
+  // gallery photos. No radios on the page → single choice from the last photo.
+  let imageUrls: string[]
+  let choiceDrafts: ScrapedChoiceDraft[]
+  if (dom.choiceOptions.length > 0) {
+    imageUrls = images
+    choiceDrafts = dom.choiceOptions.map((opt, i) => ({
+      image_url: choicePhotos[i] ?? null,
+      name: opt.name ?? dom.optionName,
+      group: opt.group ?? dom.optionGroup,
+      price: normalizeDisplayPrice(opt.priceRaw) ?? price
+    }))
+  } else {
+    imageUrls = choicePhotos.length > 0 ? images : images.slice(0, -1)
+    choiceDrafts = [
+      {
+        image_url: choicePhotos[0] ?? images[images.length - 1],
+        name: dom.optionName,
+        group: dom.optionGroup,
+        price
+      }
+    ]
+  }
 
   const specs =
     dom.specs && Object.keys(dom.specs).length > 0 ? { ...dom.specs } : undefined
@@ -88,11 +107,6 @@ export async function scrapeTemuProductPage(
     store_url: null,
     specs,
     gallery_image_urls: imageUrls,
-    choice: {
-      image_url: choiceUrl,
-      group: dom.optionGroup,
-      name: dom.optionName,
-      price
-    }
+    choices: choiceDrafts
   }
 }

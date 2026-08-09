@@ -151,9 +151,9 @@ export async function saveScrapedProductToDisk(
   })
   mkdirSync(rootAbs, { recursive: true })
 
-  const choice = product.choice
-  if (!choice?.image_url || !choice.price?.trim()) {
-    throw new Error('saveScrapedProductToDisk: choice with image and price is required')
+  const choices = product.choices ?? []
+  if (!choices.length || choices.some((c) => !c.price?.trim())) {
+    throw new Error('saveScrapedProductToDisk: at least one choice with a price is required')
   }
 
   const galleryUrls = product.gallery_image_urls ?? []
@@ -167,20 +167,30 @@ export async function saveScrapedProductToDisk(
     }
   }
 
-  let choiceBuffer: { name: string; buffer: Buffer } | null = null
-  try {
-    const { buffer, contentType } = await downloadBinary(choice.image_url)
-    choiceBuffer = { name: `01.${extFromContentType(contentType)}`, buffer }
-  } catch (exc) {
-    jobLog(`save choice image fail: ${exc instanceof Error ? exc.message : exc}`)
+  // One file per choice, indexed like the choice list (01..NN); null = not downloaded.
+  const choiceBuffers: Array<{ name: string; buffer: Buffer } | null> = []
+  for (let i = 0; i < choices.length; i++) {
+    const url = choices[i].image_url
+    if (!url) {
+      choiceBuffers.push(null)
+      continue
+    }
+    try {
+      const { buffer, contentType } = await downloadBinary(url)
+      choiceBuffers.push({ name: `${pad2(i + 1)}.${extFromContentType(contentType)}`, buffer })
+    } catch (exc) {
+      jobLog(`save choice image fail #${i + 1}: ${exc instanceof Error ? exc.message : exc}`)
+      choiceBuffers.push(null)
+    }
   }
+  const anyChoiceDownloaded = choiceBuffers.some(Boolean)
 
   let imageRels: string[] = []
-  let choiceRel = ''
+  const choiceRels: string[] = choices.map(() => '')
   let snapshotName = ''
 
   // New snapshot only when this run downloaded at least one file.
-  if (downloadedImages.length > 0 || choiceBuffer) {
+  if (downloadedImages.length > 0 || anyChoiceDownloaded) {
     const prevActive = resolveActiveSnapshot(rootAbs)
     const snapshotAbs = allocateSnapshotAbs(rootAbs)
     snapshotName = snapshotAbs.slice(rootAbs.length).replace(/^[/\\]+/, '')
@@ -200,19 +210,27 @@ export async function saveScrapedProductToDisk(
       imageRels = copyDirFiles(join(prevActive, 'images'), imagesDir).map((n) => `images/${n}`)
     }
 
-    if (choiceBuffer) {
-      writeFileSync(join(choicesDir, choiceBuffer.name), choiceBuffer.buffer)
-      choiceRel = `choices/${choiceBuffer.name}`
+    if (anyChoiceDownloaded) {
+      for (let i = 0; i < choiceBuffers.length; i++) {
+        const buf = choiceBuffers[i]
+        if (!buf) continue
+        writeFileSync(join(choicesDir, buf.name), buf.buffer)
+        choiceRels[i] = `choices/${buf.name}`
+      }
     } else if (prevActive) {
+      // Keep prior choice photos on the new active stamp (paired by sort order).
       const copied = copyDirFiles(join(prevActive, 'choices'), choicesDir)
-      if (copied.length) choiceRel = `choices/${copied[0]}`
+      copied.forEach((n, i) => {
+        if (i < choiceRels.length) choiceRels[i] = `choices/${n}`
+      })
     }
   } else {
-    // No files downloaded — do not create a snapshot; keep prior choice path for price upsert.
+    // No files downloaded — do not create a snapshot; keep prior choice paths for price upsert.
     const prevActive = resolveActiveSnapshot(rootAbs)
     if (prevActive) {
-      const prior = listFiles(join(prevActive, 'choices'))
-      if (prior.length) choiceRel = `choices/${prior[0]}`
+      listFiles(join(prevActive, 'choices')).forEach((n, i) => {
+        if (i < choiceRels.length) choiceRels[i] = `choices/${n}`
+      })
     }
   }
 
@@ -221,24 +239,22 @@ export async function saveScrapedProductToDisk(
   const saved: ScrapedProduct = {
     ...product,
     gallery_image_urls: undefined,
-    choice: undefined,
+    choices: undefined,
     local_files: {
       images: imageRels,
-      choices: [
-        {
-          file: choiceRel,
-          name: choice.name ?? null,
-          group: choice.group ?? null,
-          price: choice.price.trim()
-        }
-      ]
+      choices: choices.map((c, i) => ({
+        file: choiceRels[i],
+        name: c.name ?? null,
+        group: c.group ?? null,
+        price: c.price.trim()
+      }))
     }
   }
 
   jobLog(
     `saved product folder=${folderRel}${reused ? ' (reused root)' : ''}` +
       `${snapshotName ? ` snapshot=${snapshotName}` : ' (no snapshot)'}` +
-      ` images=${imageRels.length} choice=${choiceRel || 'none'}`
+      ` images=${imageRels.length} choices=${choiceRels.filter(Boolean).length}/${choices.length}`
   )
 
   return { folder: folderRel, product: saved }

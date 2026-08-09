@@ -8,7 +8,7 @@ import { scrapeTemuProductPage } from './temu/product'
  * to `upsertProductFromSaved` in code/products.ts.
  */
 export type ScrapedChoiceDraft = {
-  /** Remote image URL for this choice (last lightbox frame in single-choice Temu). */
+  /** Remote image URL for this choice (trailing gallery photo), null when unknown. */
   image_url?: string | null
   name?: string | null
   group?: string | null
@@ -39,8 +39,8 @@ export type ScrapedProduct = {
   status?: 'active' | 'archived'
   /** Remote gallery URLs (excludes choice image). Consumed by saveScrapedProductToDisk. */
   gallery_image_urls?: string[]
-  /** Single (or primary) choice draft before disk save. */
-  choice?: ScrapedChoiceDraft
+  /** Choice drafts before disk save, in buy-box radio order. */
+  choices?: ScrapedChoiceDraft[]
   /** Filled after save-to-disk (relative paths under the product folder). */
   local_files?: {
     images?: string[]

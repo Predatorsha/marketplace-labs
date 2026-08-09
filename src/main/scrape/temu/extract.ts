@@ -5,6 +5,7 @@ import {
   extractTemuReviews,
   extractTemuTitle
 } from './buyBox'
+import { collectTemuChoiceOptions } from './choices'
 import { extractTemuSpecs } from './details'
 import { collectTemuGallery } from './gallery'
 import { extractTemuSellerName } from './seller'
@@ -19,6 +20,8 @@ export async function extractTemuDom(page: Page): Promise<TemuDomExtract> {
   const sellerName = await extractTemuSellerName(page)
   const specs = await extractTemuSpecs(page)
   const gallery = await collectTemuGallery(page)
+  // After the gallery: clicking radios switches the selected variant on the page.
+  const choiceOptions = await collectTemuChoiceOptions(page)
 
   return {
     title,
@@ -28,6 +31,7 @@ export async function extractTemuDom(page: Page): Promise<TemuDomExtract> {
     optionGroup: option.optionGroup,
     optionName: option.optionName,
     gallery,
+    choiceOptions,
     specs,
     sellerName
   }

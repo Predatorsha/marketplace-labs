@@ -38,7 +38,7 @@ export async function scrapeProduct(
         })
 
         // Unavailable PDP: flip catalog status only (no gallery/price to save).
-        if (scraped.status === 'archived' && !scraped.choice) {
+        if (scraped.status === 'archived' && !scraped.choices?.length) {
           const applied = applyProductMarketplaceStatus(cfg, {
             platform: parsed.platform,
             marketplace_product_id: scraped.product_id,

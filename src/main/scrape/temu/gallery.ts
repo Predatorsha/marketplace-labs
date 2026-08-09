@@ -52,18 +52,8 @@ export async function collectTemuGallery(page: Page): Promise<TemuGallery> {
   const urls = srcs.map(stripQuery)
   jobLog(`temu gallery: rail=${urls.length} radios=${choiceCount}`)
   const n = Math.min(choiceCount, urls.length)
-  const choices = n > 0 ? urls.slice(urls.length - n) : []
-
-  // Dedupe images by URL (query already stripped): drop repeats and any photo
-  // that also appears among the Choice photos.
-  const seen = new Set(choices.map((u) => u.toLowerCase()))
-  const images: string[] = []
-  for (const u of urls.slice(0, urls.length - n)) {
-    const key = u.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    images.push(u)
+  return {
+    images: urls.slice(0, urls.length - n),
+    choices: n > 0 ? urls.slice(urls.length - n) : []
   }
-
-  return { images, choices }
 }
