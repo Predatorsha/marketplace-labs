@@ -1,15 +1,15 @@
 import { existsSync } from 'fs'
 import { basename, isAbsolute, resolve } from 'path'
-import type { AppConfig } from '../config'
+import { resolveAppPath, type AppConfig } from '../config'
 
+/** Absolute catalog DB path. Relative config values anchor to appRoot (never cwd). */
 export function catalogDbPath(cfg: AppConfig): string {
-  const raw = cfg.output.catalog_db
-  return isAbsolute(raw) ? raw : resolve(raw)
+  return resolveAppPath(cfg.output.catalog_db)
 }
 
+/** Absolute market/media root. Relative config values anchor to appRoot (never cwd). */
 export function marketRoot(cfg: AppConfig): string {
-  const raw = cfg.output.market_root
-  return isAbsolute(raw) ? raw : resolve(raw)
+  return resolveAppPath(cfg.output.market_root)
 }
 
 /**

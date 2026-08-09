@@ -1,5 +1,4 @@
 import { access } from 'fs/promises'
-import { resolve } from 'path'
 import type { AppConfig } from '../config'
 import {
   getProductChoices,
@@ -52,9 +51,11 @@ function normalizeKey(key: ProductKey): ProductKey {
 export function findProductRow(db: CatalogDb, cfg: AppConfig, key: ProductKey): ProductRow | null {
   const normalized = normalizeKey(key)
   if ('folder' in normalized && typeof normalized.folder === 'string') {
-    const abs = resolve(normalized.folder)
-    const rel = toRelativeFolder(cfg, abs)
-    const candidates = [rel, abs.replace(/\\/g, '/')].filter(
+    // Relative keys must go through market_root helpers — never path.resolve (cwd).
+    const input = normalized.folder
+    const rel = toRelativeFolder(cfg, input)
+    const abs = fromRelativeFolder(cfg, input)
+    const candidates = [rel, input.replace(/\\/g, '/'), abs?.replace(/\\/g, '/')].filter(
       (v, i, arr): v is string => Boolean(v) && arr.indexOf(v) === i
     )
     for (const folderPath of candidates) {
@@ -106,11 +107,11 @@ export function buildProductCard(
   imageUrls: string[] = [],
   choices: ProductCard['choices'] = []
 ): ProductCard {
-  const folderAbs =
-    fromRelativeFolder(cfg, row.folder_path) ||
-    (row.folder_path ? resolve(row.folder_path) : '')
+  const folderAbs = fromRelativeFolder(cfg, row.folder_path) || ''
   const folder_path =
-    toRelativeFolder(cfg, folderAbs) || row.folder_path || folderAbs.replace(/\\/g, '/')
+    toRelativeFolder(cfg, folderAbs || row.folder_path) ||
+    row.folder_path ||
+    folderAbs.replace(/\\/g, '/')
 
   return {
     id: row.id,
