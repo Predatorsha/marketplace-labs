@@ -94,9 +94,9 @@ export async function scrapeAliExpressProductPage(
     rating: dom.rating,
     review_count: dom.reviewCount,
     orders: dom.sold,
-    seller_name: null,
-    seller_id: null,
-    store_url: null,
+    seller_name: dom.sellerName,
+    seller_id: dom.sellerId,
+    store_url: dom.storeUrl,
     specs,
     gallery_image_urls: images,
     choices: choiceDrafts

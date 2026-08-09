@@ -2,6 +2,7 @@ import type { Page } from 'playwright'
 import { extractAliPriceRaw, extractAliReviews, extractAliTitle } from './buyBox'
 import { collectAliChoiceOptions } from './choices'
 import { collectAliDescriptionImages, collectAliSliderImages } from './gallery'
+import { extractAliSeller } from './seller'
 import { extractAliSpecs } from './specs'
 import type { AliDomExtract } from './types'
 import { sleep } from './util'
@@ -12,7 +13,8 @@ async function scrollForLazySections(page: Page): Promise<void> {
     const done = await page.evaluate(() => {
       const mounted =
         !!document.querySelector('#nav-specification') &&
-        !!document.querySelector('#product-description')
+        !!document.querySelector('#product-description') &&
+        !!document.querySelector('#nav-store')
       window.scrollBy(0, Math.round(window.innerHeight * 0.8))
       const bottom = window.scrollY + window.innerHeight >= document.body.scrollHeight - 50
       return mounted || bottom
@@ -36,6 +38,7 @@ export async function extractAliDom(page: Page): Promise<AliDomExtract> {
   await scrollForLazySections(page)
   const specs = await extractAliSpecs(page)
   const descriptionImages = await collectAliDescriptionImages(page)
+  const seller = await extractAliSeller(page)
 
   const choiceOptions = await collectAliChoiceOptions(page)
 
@@ -48,6 +51,9 @@ export async function extractAliDom(page: Page): Promise<AliDomExtract> {
     sliderImages,
     descriptionImages,
     specs,
+    sellerName: seller.sellerName,
+    storeUrl: seller.storeUrl,
+    sellerId: seller.sellerId,
     choiceOptions
   }
 }

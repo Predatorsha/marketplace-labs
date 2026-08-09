@@ -12,6 +12,9 @@ export type AliDomExtract = {
   /** Description-block photos (shadow DOM) — the primary product gallery. */
   descriptionImages: string[]
   specs: Record<string, string>
+  sellerName: string | null
+  storeUrl: string | null
+  sellerId: string | null
   /** SKU variants of the first property, [] when the page has no picker. */
   choiceOptions: AliChoiceOption[]
 }

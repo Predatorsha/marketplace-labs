@@ -152,6 +152,18 @@ const descImgs = await page.evaluate(() => {
 console.log(`description: shadow=${descImgs.hasShadow} imgs=${descImgs.imgs.length}`)
 descImgs.imgs.forEach((s) => console.log('  ', s))
 
+// --- seller (#nav-store) ---
+const seller = await page.evaluate(() => {
+  const a = document.querySelector('#nav-store a[data-pl="store-name"]')
+  if (!a) return null
+  return {
+    name: a.textContent?.trim() || null,
+    href: a.getAttribute('href'),
+    storeId: (a.getAttribute('href') || '').match(/\/store\/(\d+)/)?.[1] ?? null
+  }
+})
+console.log('seller:', JSON.stringify(seller))
+
 // --- click through sku options, read price each time ---
 const tiles = page
   .locator('[class*="sku--wrap--"] [class*="sku-item--property--"]')
