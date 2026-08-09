@@ -92,22 +92,17 @@ function rotateGalleryToAnchor(urls: string[], anchorKey: string): string[] {
   return urls.slice(idx).concat(urls.slice(0, idx))
 }
 
-async function openLightbox(page: Page): Promise<boolean> {
+async function openLightbox(page: Page): Promise<void> {
   // PDP left rail: 2nd thumb opens the preview gallery (not the hero img).
   // Stay at top so #leftContent is on-screen before the click.
   await page.evaluate(() => window.scrollTo(0, 0))
   await sleep(150)
 
   const thumb = page.locator('#leftContent ol > li:nth-child(2)').first()
-  try {
-    await thumb.scrollIntoViewIfNeeded({ timeout: 3_000 })
-    await thumb.click({ timeout: 5_000 })
-  } catch {
-    return false
-  }
+  await thumb.scrollIntoViewIfNeeded({ timeout: 3_000 })
+  await thumb.click({ timeout: 5_000 })
   await sleep(400)
   await focusLightbox(page)
-  return true
 }
 
 /** Poll until preview src key differs from `prevKey` and stays stable, or timeout. */
@@ -116,7 +111,6 @@ async function waitForFrameChange(
   prevKey: string
 ): Promise<string | null> {
   const deadline = Date.now() + FRAME_WAIT_MS
-  let candidate: string | null = null
   let candidateKey = ''
   let candidateSince = 0
 
@@ -124,53 +118,34 @@ async function waitForFrameChange(
     const raw = await readPreviewSrc(page)
     if (raw) {
       const upgraded = upgradeTemuImageUrl(raw)
-      if (upgraded && /^https?:\/\//i.test(upgraded)) {
-        const key = galleryKey(upgraded)
-        if (key !== prevKey) {
-          if (key === candidateKey) {
-            if (Date.now() - candidateSince >= FRAME_SETTLE_MS) return upgraded
-          } else {
-            candidate = upgraded
-            candidateKey = key
-            candidateSince = Date.now()
-          }
+      const key = galleryKey(upgraded)
+      if (key !== prevKey) {
+        if (key === candidateKey) {
+          if (Date.now() - candidateSince >= FRAME_SETTLE_MS) return upgraded
         } else {
-          candidate = null
-          candidateKey = ''
-          candidateSince = 0
+          candidateKey = key
+          candidateSince = Date.now()
         }
       }
     }
     await sleep(FRAME_POLL_MS)
   }
-  return candidate
+  return null
 }
 
-/**
- * Step gallery with ArrowRight once; only re-press if the frame still has not
- * changed (a blind second press skips a slide and shuffles order).
- */
+/** Step gallery with ArrowRight once; null when the frame did not change. */
 async function stepRight(page: Page, prevKey: string): Promise<string | null> {
-  await focusLightbox(page)
-  await page.keyboard.press('ArrowRight').catch(() => undefined)
-  const next = await waitForFrameChange(page, prevKey)
-  if (next) return next
-
   await focusLightbox(page)
   await page.keyboard.press('ArrowRight').catch(() => undefined)
   return waitForFrameChange(page, prevKey)
 }
 
-/** Close lightbox with Escape only; verify dialog is gone. */
+/** Close lightbox with Escape. */
 async function closeLightbox(page: Page): Promise<void> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (!(await isLightboxOpen(page))) return
-    await focusLightbox(page)
-    await page.keyboard.press('Escape').catch(() => undefined)
-    await sleep(250)
-  }
-  // Final short wait in case the dialog is animating out.
-  if (await isLightboxOpen(page)) await sleep(200)
+  if (!(await isLightboxOpen(page))) return
+  await focusLightbox(page)
+  await page.keyboard.press('Escape').catch(() => undefined)
+  await sleep(250)
 }
 
 /**
@@ -203,7 +178,7 @@ export async function collectTemuGalleryUrls(page: Page): Promise<string[]> {
 
   for (let step = 0; step < MAX_GALLERY_STEPS; step++) {
     const upgraded = await stepRight(page, prevKey)
-    // Frame did not advance after ArrowRight (+ retry) — stop.
+    // Frame did not advance after ArrowRight — stop.
     if (!upgraded) break
 
     const key = galleryKey(upgraded)

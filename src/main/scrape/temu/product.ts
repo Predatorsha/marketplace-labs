@@ -4,10 +4,8 @@ import { normalizeDisplayPrice } from '../price'
 import type { ScrapedProduct } from '../product'
 import { isTemuProductUnavailable } from './availability'
 import { extractTemuDom } from './extract'
-import { imageDedupeKey, upgradeTemuImageUrl } from './images'
+import { imageDedupeKey } from './images'
 import { sleep } from './util'
-
-export { upgradeTemuImageUrl } from './images'
 
 /**
  * Scrape a Temu product page (single-choice / no variant picker case).
@@ -53,9 +51,8 @@ export async function scrapeTemuProductPage(
   }
 
   const dom = await extractTemuDom(page)
-  const gallery = (dom.gallery || [])
-    .map((u) => upgradeTemuImageUrl(u))
-    .filter((u) => /^https?:\/\//i.test(u))
+  // Gallery URLs are already upgraded and validated by collectTemuGalleryUrls.
+  const gallery = dom.gallery || []
   if (gallery.length < 1) {
     throw new Error('temu: no gallery images found on product page')
   }

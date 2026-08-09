@@ -50,16 +50,11 @@ function allocateSnapshotAbs(productRootAbs: string): string {
   return join(productRootAbs, formatSnapshotDirName())
 }
 
-function extFromUrlOrType(url: string, contentType: string | null): string {
+function extFromContentType(contentType: string | null): string {
   const ct = (contentType || '').toLowerCase()
   if (ct.includes('png')) return 'png'
   if (ct.includes('webp')) return 'webp'
   if (ct.includes('gif')) return 'gif'
-  if (ct.includes('jpeg') || ct.includes('jpg')) return 'jpg'
-  const path = url.split('?')[0].toLowerCase()
-  if (path.endsWith('.png')) return 'png'
-  if (path.endsWith('.webp')) return 'webp'
-  if (path.endsWith('.gif')) return 'gif'
   return 'jpg'
 }
 
@@ -157,32 +152,27 @@ export async function saveScrapedProductToDisk(
   mkdirSync(rootAbs, { recursive: true })
 
   const choice = product.choice
-  if (!choice?.price?.trim()) {
-    throw new Error('saveScrapedProductToDisk: choice with price is required')
+  if (!choice?.image_url || !choice.price?.trim()) {
+    throw new Error('saveScrapedProductToDisk: choice with image and price is required')
   }
 
-  const galleryUrls = Array.isArray(product.gallery_image_urls) ? product.gallery_image_urls : []
+  const galleryUrls = product.gallery_image_urls ?? []
   const downloadedImages: Array<{ name: string; buffer: Buffer }> = []
   for (let i = 0; i < galleryUrls.length; i++) {
-    const url = galleryUrls[i]
     try {
-      const { buffer, contentType } = await downloadBinary(url)
-      const ext = extFromUrlOrType(url, contentType)
-      downloadedImages.push({ name: `${pad2(i + 1)}.${ext}`, buffer })
+      const { buffer, contentType } = await downloadBinary(galleryUrls[i])
+      downloadedImages.push({ name: `${pad2(i + 1)}.${extFromContentType(contentType)}`, buffer })
     } catch (exc) {
       jobLog(`save image fail #${i + 1}: ${exc instanceof Error ? exc.message : exc}`)
     }
   }
 
   let choiceBuffer: { name: string; buffer: Buffer } | null = null
-  if (choice.image_url) {
-    try {
-      const { buffer, contentType } = await downloadBinary(choice.image_url)
-      const ext = extFromUrlOrType(choice.image_url, contentType)
-      choiceBuffer = { name: `01.${ext}`, buffer }
-    } catch (exc) {
-      jobLog(`save choice image fail: ${exc instanceof Error ? exc.message : exc}`)
-    }
+  try {
+    const { buffer, contentType } = await downloadBinary(choice.image_url)
+    choiceBuffer = { name: `01.${extFromContentType(contentType)}`, buffer }
+  } catch (exc) {
+    jobLog(`save choice image fail: ${exc instanceof Error ? exc.message : exc}`)
   }
 
   let imageRels: string[] = []
