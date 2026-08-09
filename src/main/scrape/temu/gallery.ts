@@ -21,7 +21,7 @@ function stripQuery(url: string): string {
 /**
  * Left-rail thumbs (#leftContent ol > li) are the full gallery in Temu order.
  * First and last <li> are not photos — skip them. The trailing N photos are the
- * variant (Choice) images, N = imgs inside #rightContent [role=radio].
+ * variant (Choice) images, N = [role=radio] options in #rightContent.
  */
 export async function collectTemuGallery(page: Page): Promise<TemuGallery> {
   const { srcs, choiceCount } = await page.evaluate(() => {
@@ -41,14 +41,16 @@ export async function collectTemuGallery(page: Page): Promise<TemuGallery> {
       }
       if (src && !src.startsWith('data:')) srcs.push(src)
     }
+    // Variant options are [role=radio] in the buy box; they can be text-only
+    // (no <img> inside), so count the radios themselves.
     const choiceCount = document.querySelectorAll(
-      '#rightContent [role="radio"] img'
+      '#rightContent [role="radio"]'
     ).length
     return { srcs, choiceCount }
   })
 
   const urls = srcs.map(stripQuery)
-  jobLog(`temu gallery: rail=${urls.length} choiceImgs=${choiceCount}`)
+  jobLog(`temu gallery: rail=${urls.length} radios=${choiceCount}`)
   const n = Math.min(choiceCount, urls.length)
   const choices = n > 0 ? urls.slice(urls.length - n) : []
 
