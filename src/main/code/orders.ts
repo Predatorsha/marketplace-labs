@@ -13,25 +13,16 @@ function orderPlatform(db: CatalogDb, orderId: number): string {
   return String(row.platform).trim().toLowerCase()
 }
 
+/**
+ * Формат цены: `1 234.56`
+ * - пробелы группируют целую часть по 3 цифры
+ * - `.` только отделяет целую и дробную части (не тысячи)
+ */
 function normalizeNumericToken(token: string): string {
-  const hasComma = token.includes(',')
-  const hasDot = token.includes('.')
-  if (hasComma && hasDot) {
-    // Mixed separators: the last one is the decimal separator, the other is thousands.
-    const decimalSep = token.lastIndexOf(',') > token.lastIndexOf('.') ? ',' : '.'
-    const thousandsSep = decimalSep === ',' ? '.' : ','
-    return token.split(thousandsSep).join('').replace(decimalSep, '.')
-  }
-  const sep = hasComma ? ',' : hasDot ? '.' : null
-  if (!sep) return token
-  const parts = token.split(sep)
-  // Repeated same separator → thousands grouping: "1,234,567" → 1234567.
-  if (parts.length > 2) return parts.join('')
-  const [head, tail] = parts
-  // "1,234" shape (1-3 leading digits, exactly 3 after) → thousands separator.
-  if (tail.length === 3 && head.length >= 1 && head.length <= 3) return head + tail
-  // Otherwise a decimal separator: "12,5" → 12.5, "0.99" → 0.99.
-  return `${head}.${tail}`
+  if (!token.includes('.')) return token
+  const first = token.indexOf('.')
+  // Одна десятичная точка; лишние точки в дробной части отбрасываем.
+  return `${token.slice(0, first)}.${token.slice(first + 1).replace(/\./g, '')}`
 }
 
 export function parseMoney(value: unknown): { unitPrice: number | null; currency: string | null } {
@@ -44,7 +35,9 @@ export function parseMoney(value: unknown): { unitPrice: number | null; currency
   if (text.includes('€') || upper.includes('EUR')) currency = 'EUR'
   else if (text.includes('$') || upper.includes('USD')) currency = 'USD'
   else if (text.includes('£') || upper.includes('GBP')) currency = 'GBP'
-  const m = text.replace(/ /g, '').match(/\d+(?:[.,]\d+)*/)
+  // Убираем пробелы тысяч (обычный / nbsp / узкий), затем цифры и опциональная дробь.
+  const cleaned = text.replace(/[\s\u00a0\u202f]/g, '')
+  const m = cleaned.match(/\d+(?:\.\d+)?/)
   if (!m) return { unitPrice: null, currency }
   const parsed = Number(normalizeNumericToken(m[0]))
   return { unitPrice: Number.isFinite(parsed) ? parsed : null, currency }
