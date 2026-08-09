@@ -57,18 +57,18 @@ export async function scrapeAliExpressProductPage(
     throw new Error(`aliexpress: could not parse price (raw=${dom.priceRaw ?? 'null'})`)
   }
 
-  const n = dom.choiceOptions.length
+  // Trailing slider photos duplicate the image-carrying SKU property options.
+  const n = dom.skuImageCount
   const sliderMain =
     n > 0 ? dom.sliderImages.slice(0, Math.max(0, dom.sliderImages.length - n)) : dom.sliderImages
-  const skuTrailing = n > 0 ? dom.sliderImages.slice(-n) : []
   const images = dom.descriptionImages.length ? dom.descriptionImages : sliderMain
 
-  // One choice per SKU tile, photo from the tile itself (trailing slider photo
-  // by index as fallback). No picker on the page → single choice, last slider photo.
+  // One choice per SKU combo, photo from the combo's image-property tile.
+  // No picker on the page → single choice, last slider photo.
   let choiceDrafts: ScrapedChoiceDraft[]
-  if (n > 0) {
-    choiceDrafts = dom.choiceOptions.map((opt, i) => ({
-      image_url: opt.imageUrl ?? skuTrailing[i] ?? null,
+  if (dom.choiceOptions.length > 0) {
+    choiceDrafts = dom.choiceOptions.map((opt) => ({
+      image_url: opt.imageUrl,
       name: opt.name,
       group: opt.group,
       price: normalizeDisplayPrice(opt.priceRaw) ?? price

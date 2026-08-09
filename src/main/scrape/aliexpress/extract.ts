@@ -41,7 +41,7 @@ export async function extractAliDom(page: Page): Promise<AliDomExtract> {
   const descriptionImages = await collectAliDescriptionImages(page)
   const seller = await extractAliSeller(page)
 
-  const choiceOptions = await collectAliChoiceOptions(page)
+  const choicesResult = await collectAliChoiceOptions(page)
 
   return {
     title,
@@ -56,6 +56,7 @@ export async function extractAliDom(page: Page): Promise<AliDomExtract> {
     sellerName: seller.sellerName,
     storeUrl: seller.storeUrl,
     sellerId: seller.sellerId,
-    choiceOptions
+    choiceOptions: choicesResult.options,
+    skuImageCount: choicesResult.skuImageCount
   }
 }

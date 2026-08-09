@@ -193,22 +193,30 @@ const seller = await page.evaluate(() => {
 })
 console.log('seller:', JSON.stringify(seller))
 
-// --- click through sku options, read price each time ---
-const tiles = page
-  .locator('[class*="sku--wrap--"] [class*="sku-item--property--"]')
-  .first()
-  .locator('[data-sku-col]')
-const tileCount = await tiles.count()
-for (let i = 0; i < tileCount; i++) {
-  await tiles.nth(i).scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => undefined)
-  await tiles.nth(i).click({ timeout: 5000 }).catch((e) => console.log('click fail', e.message))
+// --- click through sku combos (all properties), read price each time ---
+const PROP_SEL = '[class*="sku--wrap--"] [class*="sku-item--property--"]'
+const propCounts = []
+for (let pi = 0; pi < (await page.locator(PROP_SEL).count()); pi++) {
+  propCounts.push(await page.locator(PROP_SEL).nth(pi).locator('[data-sku-col]').count())
+}
+let combos = [[]]
+for (const c of propCounts) {
+  combos = combos.flatMap((cc) => Array.from({ length: c }, (_, i) => [...cc, i]))
+}
+combos = combos.slice(0, 12)
+for (const combo of combos) {
+  for (let pi = 0; pi < combo.length; pi++) {
+    const tile = page.locator(PROP_SEL).nth(pi).locator('[data-sku-col]').nth(combo[pi])
+    await tile.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => undefined)
+    await tile.click({ timeout: 5000 }).catch((e) => console.log('click fail', e.message))
+  }
   await page.waitForTimeout(800)
   const p = await page.evaluate(
     () =>
       document.querySelector('[class*="price-default--current--"]')?.textContent?.trim() ||
       null
   )
-  console.log(`choice #${i + 1} price:`, p)
+  console.log(`combo [${combo.join(',')}] price:`, p)
 }
 
 await page.screenshot({ path: 'scripts/aliexpress-probe.png', fullPage: false })

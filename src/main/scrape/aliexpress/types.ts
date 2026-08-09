@@ -17,6 +17,8 @@ export type AliDomExtract = {
   sellerName: string | null
   storeUrl: string | null
   sellerId: string | null
-  /** SKU variants of the first property, [] when the page has no picker. */
+  /** SKU combos across all properties, [] when the page has no picker. */
   choiceOptions: AliChoiceOption[]
+  /** Option count of the image-carrying SKU property (trailing slider photos). */
+  skuImageCount: number
 }
