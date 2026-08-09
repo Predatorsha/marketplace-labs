@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS products (
   rating TEXT,
   review_count TEXT,
   description TEXT,
-  description_html TEXT,
   orders TEXT,
   seller_name TEXT,
   seller_id TEXT,

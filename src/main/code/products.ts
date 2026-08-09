@@ -193,7 +193,6 @@ export function upsertProductRecord(
     rating?: string | null
     review_count?: string | null
     description?: string | null
-    description_html?: string | null
     orders?: string | null
     seller_name?: string | null
     seller_id?: string | null
@@ -249,7 +248,6 @@ export function upsertProductRecord(
            rating = COALESCE(?, rating),
            review_count = COALESCE(?, review_count),
            description = COALESCE(?, description),
-           description_html = COALESCE(?, description_html),
            orders = COALESCE(?, orders),
            seller_name = COALESCE(?, seller_name),
            seller_id = COALESCE(?, seller_id),
@@ -268,7 +266,6 @@ export function upsertProductRecord(
       ratingVal,
       reviewCountVal,
       normalizeTextField(opts.description),
-      typeof opts.description_html === 'string' ? opts.description_html : null,
       normalizeTextField(opts.orders),
       normalizeTextField(opts.seller_name),
       normalizeTextField(opts.seller_id),
@@ -287,10 +284,10 @@ export function upsertProductRecord(
     .prepare(
       `INSERT INTO products (
         platform, marketplace_product_id, title, url, folder_path, purpose, pack_quantity,
-        rating, review_count, description, description_html, orders,
+        rating, review_count, description, orders,
         seller_name, seller_id, store_url, video,
         status, last_seen_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       platform,
@@ -303,7 +300,6 @@ export function upsertProductRecord(
       ratingVal,
       reviewCountVal,
       normalizeTextField(opts.description),
-      typeof opts.description_html === 'string' ? opts.description_html : null,
       normalizeTextField(opts.orders),
       normalizeTextField(opts.seller_name),
       normalizeTextField(opts.seller_id),
@@ -460,7 +456,7 @@ function parseSpecsFromProduct(product: Record<string, unknown>): ProductSpecRow
  * Insert / update a scraped (or otherwise saved) product in the catalog DB.
  *
  * Expected `product` fields: product_id (required), title, url, purpose,
- * pack_quantity, tags, rating, review_count, description, description_html,
+ * pack_quantity, tags, rating, review_count, description,
  * orders, seller_*, store_url, video, specs,
  * local_files.images (string[]), local_files.choices ({ file, name, group, price }[]).
  * At least one choice with a price is required.
@@ -554,10 +550,6 @@ export async function upsertProductFromSaved(
       rating: normalizeTextField(opts.product.rating),
       review_count: normalizeTextField(opts.product.review_count),
       description: normalizeTextField(opts.product.description),
-      description_html:
-        typeof opts.product.description_html === 'string'
-          ? opts.product.description_html
-          : null,
       orders: normalizeTextField(opts.product.orders),
       seller_name: normalizeTextField(opts.product.seller_name),
       seller_id: normalizeTextField(opts.product.seller_id),

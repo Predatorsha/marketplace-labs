@@ -26,7 +26,6 @@ export type ScrapedProduct = {
   rating?: string | null
   review_count?: string | null
   description?: string | null
-  description_html?: string | null
   orders?: string | null
   seller_name?: string | null
   seller_id?: string | null

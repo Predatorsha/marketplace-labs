@@ -10,7 +10,6 @@ const PRODUCTS_COLUMNS: Array<{ name: string; ddl: string }> = [
   { name: 'rating', ddl: 'TEXT' },
   { name: 'review_count', ddl: 'TEXT' },
   { name: 'description', ddl: 'TEXT' },
-  { name: 'description_html', ddl: 'TEXT' },
   { name: 'orders', ddl: 'TEXT' },
   { name: 'seller_name', ddl: 'TEXT' },
   { name: 'seller_id', ddl: 'TEXT' },
@@ -51,7 +50,14 @@ export function migrateCatalogSchema(db: CatalogDb, cfg: AppConfig): void {
       if (productCols.has(col.name)) continue
       db.exec(`ALTER TABLE products ADD COLUMN ${col.name} ${col.ddl}`)
     }
-    for (const drop of ['discount', 'ships_from', 'shipping', 'price', 'currency'] as const) {
+    for (const drop of [
+      'discount',
+      'ships_from',
+      'shipping',
+      'price',
+      'currency',
+      'description_html'
+    ] as const) {
       if (!productCols.has(drop)) continue
       try {
         db.exec(`ALTER TABLE products DROP COLUMN ${drop}`)
