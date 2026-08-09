@@ -437,6 +437,10 @@ input {
   color: transparent;
 }
 
+.info-fields:not(.editing) .info-row dd.filled {
+  cursor: text;
+}
+
 .info-fields.editing .info-row {
   align-items: center;
 }

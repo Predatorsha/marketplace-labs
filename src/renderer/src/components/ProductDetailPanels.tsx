@@ -118,6 +118,15 @@ function draftValue(label: FieldLabel, draft: Draft, product: ProductDetailsData
   }
 }
 
+function selectElementText(el: HTMLElement): void {
+  const selection = window.getSelection()
+  if (!selection) return
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
 export default function ProductDetailPanels({
   product,
   emptyInfoText = 'Product details will appear here after import.',
@@ -236,7 +245,14 @@ export default function ProductDetailPanels({
               return (
                 <div key={label} className="info-row">
                   <dt>{label}</dt>
-                  <dd className={value || canEdit ? 'filled' : ''}>
+                  <dd
+                    className={value || canEdit ? 'filled' : ''}
+                    onClick={
+                      !canEdit && value
+                        ? (e) => selectElementText(e.currentTarget)
+                        : undefined
+                    }
+                  >
                     {canEdit && label === 'Status' ? (
                       <select
                         className="info-input"

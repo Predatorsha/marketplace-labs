@@ -6,10 +6,20 @@ export type ParsedProductUrl = {
   url: string
 }
 
-/** Temu goods id from pathname only: `...-g-607694501077974.html`. */
+/**
+ * Temu goods id from the original URL (never refined later):
+ * - pathname `...-g-607694501077974.html`
+ * - or query `goods.html?goods_id=607154744485323` (ad / share links)
+ * Prefer pathname; do not use tracking params like `_x_ns_goods_id`.
+ */
 function extractTemuGoodsId(url: URL): string | null {
-  const m = url.pathname.match(/-g-(\d{6,})(?:\.html)?$/i)
-  return m?.[1] ?? null
+  const fromPath = url.pathname.match(/-g-(\d{6,})(?:\.html)?$/i)?.[1]
+  if (fromPath) return fromPath
+
+  const fromQuery = url.searchParams.get('goods_id')?.trim()
+  if (fromQuery && /^\d{6,}$/.test(fromQuery)) return fromQuery
+
+  return null
 }
 
 function extractAliExpressItemId(url: URL): string | null {
@@ -24,7 +34,7 @@ function extractAliExpressItemId(url: URL): string | null {
 
 /**
  * Detect platform + product id from a marketplace product URL.
- * Temu: id is taken once from `-g-{digits}` in the original pathname (never refined later).
+ * Temu: id is taken once from the original URL (`-g-{digits}` or `goods_id=`).
  */
 export function parseProductUrl(raw: string): ParsedProductUrl {
   const trimmed = String(raw || '').trim()
