@@ -1,5 +1,6 @@
 import type { Page } from 'playwright'
 import { ensureTemuLoggedIn } from '../../browser/auth/temu'
+import { jobLog } from '../../jobs/log'
 import { normalizeDisplayPrice } from '../price'
 import type { ScrapedChoiceDraft, ScrapedProduct } from '../product'
 import { isTemuProductUnavailable } from './availability'
@@ -8,6 +9,34 @@ import { sleep } from './util'
 
 /** Referer for downloading Temu CDN images outside the browser. */
 export const TEMU_IMAGE_REFERER = 'https://www.temu.com/'
+
+/**
+ * Карточка, открытая по ссылке из деталки заказа (_oak_* параметры), иногда
+ * сразу показывает модалку выбора SKU (#skuSelector). Она перекрывает галерею
+ * и буй-бокс: галерея кажется пустой, клики по вариантам перехватываются.
+ * Закрываем крестиком; модалки может и не быть — тогда no-op.
+ */
+async function closeTemuSkuModal(page: Page): Promise<void> {
+  for (let i = 0; i < 3; i++) {
+    const closed = await page
+      .evaluate(() => {
+        const dialogs = Array.from(document.querySelectorAll('[role="dialog"]'))
+        for (const dlg of dialogs) {
+          if (!dlg.querySelector('#skuSelector')) continue
+          const btn = dlg.querySelector<HTMLElement>('[role="button"][aria-label="close"]')
+          if (btn) {
+            btn.click()
+            return true
+          }
+        }
+        return false
+      })
+      .catch(() => false)
+    if (!closed) return
+    jobLog('temu product: closed SKU-selector modal over product page')
+    await sleep(700)
+  }
+}
 
 /**
  * Scrape a Temu product page: fields, gallery, and all buy-box choices.
@@ -44,6 +73,8 @@ export async function scrapeTemuProductPage(
     )
     .catch(() => undefined)
 
+  await closeTemuSkuModal(page)
+
   if (await isTemuProductUnavailable(page)) {
     return {
       product_id: opts.productId,
@@ -51,6 +82,15 @@ export async function scrapeTemuProductPage(
       status: 'archived'
     }
   }
+
+  // После закрытия модалки (или просто медленного рендера) даём галерее
+  // дорисоваться: пустой рейл — главный источник «no gallery images found».
+  await page
+    .waitForFunction(
+      () => document.querySelectorAll('#leftContent ol > li').length > 2,
+      { timeout: 15_000 }
+    )
+    .catch(() => undefined)
 
   const dom = await extractTemuDom(page)
   const { images, choices: choicePhotos } = dom.gallery
