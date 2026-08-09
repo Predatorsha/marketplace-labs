@@ -22,6 +22,12 @@ export type PackagePayload = {
   status?: string | null
   extra_tracks?: string[] | null
   tracks?: string[] | null
+  /**
+   * Явный маппинг «какие позиции заказа лежат в этой посылке» — номера строк
+   * (line_number) из items того же payload. Если не задан и посылка в заказе
+   * одна — все позиции линкуются на неё автоматически.
+   */
+  item_line_numbers?: number[] | null
 }
 
 export type OrderPayload = {
@@ -29,6 +35,7 @@ export type OrderPayload = {
   marketplace_order_id?: string | null
   status?: string | null
   ordered_at?: string | null
+  discount?: string | null
   items?: OrderItemPayload[] | null
   packages?: PackagePayload[] | null
 }

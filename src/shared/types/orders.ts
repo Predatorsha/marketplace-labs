@@ -1,5 +1,43 @@
 import type { PlatformId } from './humanGate'
 
+/** Заказ, найденный в списке заказов маркетплейса (ещё не скачанный целиком). */
+export type OrderSyncOrder = {
+  marketplace_order_id: string
+  /** Статус как на странице списка, например "Delivered on Jun 14, 2026". */
+  status: string | null
+  /** ISO-дата оформления заказа (YYYY-MM-DD), null если не распарсилась. */
+  ordered_at: string | null
+  items_count: number | null
+  /** Сумма заказа как текст со страницы, например "219,46 €". */
+  total: string | null
+}
+
+/** Результат прохода по списку заказов: что качать, что обновили, что пропустили. */
+export type OrderSyncPlan = {
+  platform: PlatformId
+  /** Сколько карточек заказов увидели в списке всего. */
+  discovered: number
+  /** Заказы, которых нет в БД — их нужно скачать (следующая итерация). */
+  to_download: OrderSyncOrder[]
+  /** Известные заказы, у которых сменился статус — статус обновлён в БД. */
+  status_updated: OrderSyncOrder[]
+  /** Известные заказы с терминальным статусом в БД — не трогаем. */
+  skipped_final: number
+  /** Известные заказы, статус не изменился. */
+  skipped_unchanged: number
+  /** true — домотали до конца списка (кнопки "View more" больше нет). */
+  reached_end: boolean
+  /** Заказы из to_download, успешно скачанные и записанные в БД. */
+  orders_synced: number
+  /** Заказы из to_download, которые скачать не удалось (повторятся в следующем прогоне). */
+  orders_failed: number
+  /** Карточек товаров скачано (новых, у которых ещё не было папки). */
+  products_scraped: number
+  products_failed: number
+  /** Известные заказы, у которых обновили посылки/треки со страницы Track order. */
+  packages_refreshed: number
+}
+
 export type OrderStartResult =
   | {
       ok: false
@@ -16,5 +54,6 @@ export type OrderStartResult =
       products: number
       ordersFailed?: number
       productsFailed?: number
+      plan?: OrderSyncPlan
       error?: string
     }

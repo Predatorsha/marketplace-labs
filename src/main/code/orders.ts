@@ -59,6 +59,76 @@ export function hasOrder(cfg: AppConfig, platform: string, marketplaceOrderId: s
   }
 }
 
+/**
+ * Терминальный статус заказа: дальше он на маркетплейсе не меняется,
+ * такие заказы при синке не перечитываем и статус не обновляем.
+ * Delivered — по требованию; Refunded — деньги вернули, заказ уже не «оживёт».
+ */
+export function isFinalOrderStatus(status: string | null | undefined): boolean {
+  const s = String(status || '').trim()
+  return /^delivered\b/i.test(s) || /^refunded$/i.test(s)
+}
+
+/** marketplace_order_id → status для всех заказов платформы в БД. */
+export function listOrderStatuses(cfg: AppConfig, platform: string): Map<string, string | null> {
+  const db = connect(cfg)
+  try {
+    const rows = db
+      .prepare(`SELECT marketplace_order_id, status FROM orders WHERE platform = ?`)
+      .all(platform.trim().toLowerCase()) as Array<{
+      marketplace_order_id: string
+      status: string | null
+    }>
+    return new Map(rows.map((r) => [String(r.marketplace_order_id), r.status]))
+  } finally {
+    db.close()
+  }
+}
+
+/**
+ * Обновляет статусы уже существующих заказов (INSERT не делает: факт наличия
+ * строки в orders означает «заказ скачан», а скачивание — отдельный шаг).
+ */
+export function updateOrderStatuses(
+  cfg: AppConfig,
+  platform: string,
+  updates: Array<{ marketplace_order_id: string; status: string }>
+): number {
+  if (!updates.length) return 0
+  const plat = platform.trim().toLowerCase()
+  const db = connect(cfg)
+  try {
+    const stmt = db.prepare(
+      `UPDATE orders SET status = ?, updated_at = ?
+       WHERE platform = ? AND marketplace_order_id = ?`
+    )
+    let n = 0
+    db.exec('BEGIN')
+    try {
+      for (const u of updates) {
+        const info = stmt.run(
+          u.status.trim(),
+          utcNowIso(),
+          plat,
+          String(u.marketplace_order_id).trim()
+        )
+        n += Number(info.changes)
+      }
+      db.exec('COMMIT')
+    } catch (exc) {
+      try {
+        db.exec('ROLLBACK')
+      } catch {
+        /* ignore */
+      }
+      throw exc
+    }
+    return n
+  } finally {
+    db.close()
+  }
+}
+
 export function listKnownOrderIds(cfg: AppConfig, platform: string): Set<string> {
   const db = connect(cfg)
   try {
@@ -100,6 +170,7 @@ function upsertOrder(
     marketplace_order_id: string
     status?: string | null
     ordered_at?: string | null
+    discount?: string | null
   }
 ): number {
   const platform = opts.platform.trim().toLowerCase()
@@ -113,18 +184,27 @@ function upsertOrder(
       `UPDATE orders
        SET status = COALESCE(?, status),
            ordered_at = COALESCE(?, ordered_at),
+           discount = COALESCE(?, discount),
            updated_at = ?
        WHERE id = ?`
-    ).run(opts.status ?? null, opts.ordered_at ?? null, now, row.id)
+    ).run(opts.status ?? null, opts.ordered_at ?? null, opts.discount ?? null, now, row.id)
     return row.id
   }
   const info = db
     .prepare(
       `INSERT INTO orders (
-        platform, marketplace_order_id, status, ordered_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?)`
+        platform, marketplace_order_id, status, ordered_at, discount, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(platform, marketplace_order_id, opts.status ?? null, opts.ordered_at ?? null, now, now)
+    .run(
+      platform,
+      marketplace_order_id,
+      opts.status ?? null,
+      opts.ordered_at ?? null,
+      opts.discount ?? null,
+      now,
+      now
+    )
   return Number(info.lastInsertRowid)
 }
 
@@ -448,10 +528,12 @@ export function applyOrderSyncPayload(
           platform,
           marketplace_order_id: oid,
           status: od.status,
-          ordered_at: od.ordered_at
+          ordered_at: od.ordered_at,
+          discount: od.discount
         })
         nOrders += 1
         const itemIds: number[] = []
+        const lineToItemId = new Map<number, number>()
         for (let idx = 0; idx < (od.items || []).length; idx++) {
           const it = (od.items || [])[idx]
           const lineNo = it.line_number == null ? idx + 1 : Number(it.line_number)
@@ -472,9 +554,11 @@ export function applyOrderSyncPayload(
               product_url: it.url
             })
           )
+          lineToItemId.set(lineNo, itemIds[itemIds.length - 1])
           nItems += 1
         }
         const packageIds: number[] = []
+        let anyExplicitMapping = false
         for (const pkg of od.packages || []) {
           const track = String(pkg.track || pkg.tracking_code || '').trim()
           if (!track) continue
@@ -491,8 +575,29 @@ export function applyOrderSyncPayload(
           linkPackageOrder(db, packageId, orderPk)
           nPackages += 1
           packageIds.push(packageId)
+
+          // Явный маппинг позиций (Temu: товары посылки со страницы Track order).
+          if (pkg.item_line_numbers?.length) {
+            anyExplicitMapping = true
+            for (const ln of pkg.item_line_numbers) {
+              const iid = lineToItemId.get(Number(ln))
+              if (iid == null) {
+                console.log(`[orders] order ${oid}: package line ${ln} has no matching item`)
+                continue
+              }
+              const oi = db
+                .prepare(`SELECT quantity FROM order_items WHERE id = ?`)
+                .get(iid) as { quantity: number | null } | undefined
+              try {
+                linkPackageItem(db, packageId, iid, oi?.quantity ?? 1)
+              } catch (exc) {
+                // Не валим весь заказ из-за расхождения количеств в маппинге посылок.
+                console.log(`[orders] order ${oid}: package item link failed: ${exc}`)
+              }
+            }
+          }
         }
-        if (packageIds.length === 1) {
+        if (packageIds.length === 1 && !anyExplicitMapping) {
           // Single package → all order lines belong to it.
           for (const iid of itemIds) {
             const oi = db
@@ -500,7 +605,7 @@ export function applyOrderSyncPayload(
               .get(iid) as { quantity: number | null } | undefined
             linkPackageItem(db, packageIds[0], iid, oi?.quantity ?? 1)
           }
-        } else if (packageIds.length > 1) {
+        } else if (packageIds.length > 1 && !anyExplicitMapping) {
           console.log(
             `[orders] order ${oid}: ${packageIds.length} packages but no per-item ` +
               `package mapping — skipping package_items linking`

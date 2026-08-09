@@ -28,9 +28,16 @@ function platformLabel(platform: string): string {
   return platform || '—'
 }
 
-function formatPrice(item: CatalogListItem): string {
-  if (!item.price) return '—'
-  return item.price.trim() || '—'
+/** First choice price plus how many more are hidden behind it. */
+function splitPrices(item: CatalogListItem): { first: string; more: number; all: string } {
+  const all = (item.price || '').trim()
+  if (!all) return { first: '—', more: 0, all: '' }
+  const parts = all
+    .split(';')
+    .map((p) => p.trim())
+    .filter(Boolean)
+  if (!parts.length) return { first: '—', more: 0, all: '' }
+  return { first: parts[0], more: parts.length - 1, all }
 }
 
 /** Card heading: purpose + optional (Npcs). */
@@ -254,7 +261,19 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
                 </div>
                 <div className="catalog-card-footer">
                   <div className="catalog-card-meta">
-                    <span className="catalog-card-price">{formatPrice(item)}</span>
+                    {(() => {
+                      const { first, more, all } = splitPrices(item)
+                      return (
+                        <span className="catalog-card-price" title={more > 0 ? all : undefined}>
+                          {first}
+                          {more > 0 && (
+                            <span className="catalog-card-price-more">
+                              +{more} more price{more > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    })()}
                     <span className="catalog-card-platform">{platformLabel(item.platform)}</span>
                   </div>
                   <span className="catalog-card-heart" aria-hidden="true">
