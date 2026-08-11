@@ -16,7 +16,7 @@ import {
 } from '../components/icons'
 import { pageItems, platformLabel } from '../lib/listUi'
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 6
 
 type Props = {
   onStatus?: (message: string, kind?: 'ok' | 'error') => void

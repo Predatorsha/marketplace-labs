@@ -791,9 +791,10 @@ select.info-input {
   padding: 2px 2px 8px;
 }
 
+/* Страница листается по 6 плашек — сетка 3×2. */
 .catalog-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -1052,12 +1053,6 @@ select.info-input {
 
 .catalog-total svg {
   image-rendering: pixelated;
-}
-
-@media (max-width: 1100px) {
-  .catalog-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 860px) {

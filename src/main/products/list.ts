@@ -14,7 +14,7 @@ import type {
 } from '../../shared/types'
 import { resolveCoverPath } from './gallery'
 
-const DEFAULT_PAGE_SIZE = 8
+const DEFAULT_PAGE_SIZE = 6
 const MAX_PAGE_SIZE = 48
 
 export async function listProducts(
