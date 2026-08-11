@@ -33,6 +33,8 @@ export type TemuOrderItemDetail = {
   title: string | null
   /** Цена позиции, нормализованная ("3.19 €"); промо-цена, если показана. */
   price: string | null
+  /** true — бесплатный подарок к заказу: вместо цены строка "Free". */
+  is_gift: boolean
   /** Текст варианта/SKU, например "100pcs" или "Blue, Pink, Clear". */
   variant: string | null
   quantity: number | null
@@ -129,6 +131,9 @@ export async function extractTemuOrderDetail(page: Page): Promise<TemuOrderDetai
 
       const priceLine = lines.find((l) => moneyRe.test(l)) || null
       const promoM = (block?.innerText || '').match(/After promos applied:\s*([\d.,\s]+[€$£])/)
+      // Бесплатный подарок: вместо цены отдельная строка "Free"
+      // ("Free returns" и прочие бейджи не матчатся — только слово целиком).
+      const isGift = !priceLine && lines.some((l) => /^free$/i.test(l))
 
       // Вариант — строка перед ×N, не являющаяся тайтлом/ценой/промо/бейджем.
       let variant: string | null = null
@@ -140,7 +145,8 @@ export async function extractTemuOrderDetail(page: Page): Promise<TemuOrderDetai
             moneyRe.test(l) ||
             /After promos applied/i.test(l) ||
             /^One-click pay$/i.test(l) ||
-            /^Pre-order$/i.test(l)
+            /^Pre-order$/i.test(l) ||
+            /^free$/i.test(l)
           ) {
             continue
           }
@@ -154,6 +160,7 @@ export async function extractTemuOrderDetail(page: Page): Promise<TemuOrderDetai
         line_number: i + 1,
         title,
         price_raw: promoM ? promoM[1] : priceLine,
+        is_gift: isGift,
         variant,
         quantity,
         image: img?.getAttribute('src') || null
@@ -181,6 +188,7 @@ export async function extractTemuOrderDetail(page: Page): Promise<TemuOrderDetai
       line_number: it.line_number,
       title: it.title,
       price: normalizeTemuMoney(it.price_raw),
+      is_gift: it.is_gift,
       variant: it.variant,
       quantity: it.quantity,
       image: it.image,

@@ -2,10 +2,22 @@ import { ipcMain } from 'electron'
 import { loadConfig } from '../../config'
 import { resolveHumanGate } from '../../browser/humanGate'
 import { jobLog } from '../../jobs/log'
+import { listOrders } from '../../orders/list'
 import { syncOrders } from '../../scrape/orders'
-import type { OrderStartResult } from '../../../shared/types'
+import type { OrderListQuery, OrderStartResult } from '../../../shared/types'
 
 export function registerOrdersHandlers(): void {
+  ipcMain.handle('orders:list', async (_evt, args: OrderListQuery = {}) => {
+    const cfg = loadConfig()
+    try {
+      return await listOrders(cfg, args || {})
+    } catch (exc) {
+      const message = exc instanceof Error ? exc.message : String(exc)
+      jobLog(`[ipc] orders:list fail ${message}`)
+      return { ok: false, error: message }
+    }
+  })
+
   /**
    * Синк списка заказов: мотает список, обновляет статусы известных заказов,
    * возвращает план — какие заказы ещё не скачаны (само скачивание — TODO).

@@ -1,5 +1,7 @@
 import type {
   HumanGateEvent,
+  OrderListQuery,
+  OrderListResult,
   OrderStartResult,
   PlatformId,
   ProductDownloadResult,
@@ -13,6 +15,7 @@ import type {
 
 export type DesktopApi = {
   startOrderSync: (platform: PlatformId) => Promise<OrderStartResult>
+  listOrders: (query?: OrderListQuery) => Promise<OrderListResult>
   continueHumanGate: (gateId: number) => Promise<boolean>
   cancelHumanGate: (gateId: number) => Promise<boolean>
   onHumanGate: (cb: (payload: HumanGateEvent) => void) => () => void

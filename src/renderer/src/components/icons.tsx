@@ -99,6 +99,17 @@ export function IconHeart({ className, size = 12 }: IconProps): React.JSX.Elemen
   )
 }
 
+export function IconRefresh({ className, size = 16 }: IconProps): React.JSX.Element {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M8 2a6 6 0 106 6h-2a4 4 0 11-4-4V2zm1-2l5 3.5L9 7V0z"
+      />
+    </svg>
+  )
+}
+
 export function IconSearch({ className, size = 16 }: IconProps): React.JSX.Element {
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">

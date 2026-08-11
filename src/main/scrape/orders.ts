@@ -179,7 +179,19 @@ export async function syncOrders(
         jobLog(`orders sync: ${productUrlByTitle.size} known product titles loaded from db`)
       }
 
-      for (const order of [...toDownload].reverse()) {
+      // ВРЕМЕННЫЙ кап на прогон: качаем только первые N заказов очереди
+      // (самые старые). Недокачанные не попадают в БД и вернутся в to_download
+      // при следующем прогоне. Убрать после проверки. — 2026-08-11
+      const MAX_DOWNLOAD_ORDERS = 3
+      const downloadQueue = [...toDownload].reverse().slice(0, MAX_DOWNLOAD_ORDERS)
+      if (downloadQueue.length < toDownload.length) {
+        jobLog(
+          `orders sync: TEMP cap — downloading ${downloadQueue.length}/${toDownload.length}` +
+            ` pending orders`
+        )
+      }
+
+      for (const order of downloadQueue) {
         try {
           const payload = await service.fetchOrder(page, order, { productUrlByTitle })
           if (!payload) {

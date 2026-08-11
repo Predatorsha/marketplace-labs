@@ -280,6 +280,7 @@ function upsertOrderItem(
     unit_price?: number | null
     currency?: string | null
     price?: string | number | null
+    is_gift?: boolean | null
     sku?: string | null
     marketplace_item_id?: string | null
     source_line_key?: string | null
@@ -309,6 +310,10 @@ function upsertOrderItem(
   }
   if (typeof currency === 'string') currency = currency.trim().toUpperCase() || null
 
+  // Подарок ("Free"): в заказе он стоит 0, но это цена позиции, а не товара.
+  const isGift = opts.is_gift === true
+  if (isGift && unitPrice == null) unitPrice = 0
+
   let productId: number | null = null
   if (mpid) {
     productId = upsertProductRecord(db, cfg, {
@@ -317,8 +322,10 @@ function upsertOrderItem(
       title: opts.title,
       url: opts.product_url
     })
-    const priceHint =
-      opts.price != null
+    // Карточке товара нулевую «подарочную» цену не подсказываем.
+    const priceHint = isGift
+      ? null
+      : opts.price != null
         ? opts.price
         : unitPrice != null
           ? currency
@@ -349,6 +356,7 @@ function upsertOrderItem(
            quantity = COALESCE(?, quantity),
            unit_price = COALESCE(?, unit_price),
            currency = COALESCE(?, currency),
+           is_gift = COALESCE(?, is_gift),
            sku = COALESCE(?, sku),
            marketplace_item_id = COALESCE(?, marketplace_item_id),
            source_line_key = COALESCE(?, source_line_key),
@@ -361,6 +369,7 @@ function upsertOrderItem(
       opts.quantity ?? null,
       unitPrice,
       currency,
+      opts.is_gift == null ? null : isGift ? 1 : 0,
       skuVal,
       itemId,
       lineKey,
@@ -379,9 +388,9 @@ function upsertOrderItem(
     .prepare(
       `INSERT INTO order_items (
         order_id, product_id, marketplace_product_id, marketplace_item_id,
-        source_line_key, title, quantity, unit_price, currency, sku,
+        source_line_key, title, quantity, unit_price, currency, is_gift, sku,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       opts.order_id,
@@ -393,6 +402,7 @@ function upsertOrderItem(
       opts.quantity ?? null,
       unitPrice,
       currency,
+      isGift ? 1 : 0,
       skuVal,
       now,
       now
@@ -607,6 +617,7 @@ export function applyOrderSyncPayload(
               unit_price: it.unit_price,
               currency: it.currency,
               price: it.price,
+              is_gift: it.is_gift,
               marketplace_item_id: it.marketplace_item_id || it.item_id,
               source_line_key: it.source_line_key,
               line_number: lineNo,

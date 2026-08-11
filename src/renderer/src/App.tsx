@@ -8,6 +8,7 @@ import HumanGateModal from './components/HumanGateModal'
 import Sidebar, { type NavId } from './components/Sidebar'
 import ImportPage from './pages/ImportPage'
 import CatalogPage from './pages/CatalogPage'
+import OrdersPage from './pages/OrdersPage'
 
 export default function App(): React.JSX.Element {
   const [nav, setNav] = useState<NavId>('import')
@@ -151,7 +152,7 @@ export default function App(): React.JSX.Element {
   }
 
   function onNavigate(id: NavId): void {
-    if (id === 'import' || id === 'catalog') {
+    if (id === 'import' || id === 'catalog' || id === 'orders') {
       setNav(id)
       setStatus('')
       return
@@ -180,6 +181,14 @@ export default function App(): React.JSX.Element {
         ) : null}
         {nav === 'catalog' ? (
           <CatalogPage
+            onStatus={(message, kind = 'ok') => {
+              setStatus(message)
+              setStatusKind(kind)
+            }}
+          />
+        ) : null}
+        {nav === 'orders' ? (
+          <OrdersPage
             onStatus={(message, kind = 'ok') => {
               setStatus(message)
               setStatusKind(kind)

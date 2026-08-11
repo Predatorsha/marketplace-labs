@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   quantity INTEGER,
   unit_price REAL,
   currency TEXT,
+  is_gift INTEGER NOT NULL DEFAULT 0,
   sku TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL

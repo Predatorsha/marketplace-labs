@@ -5,7 +5,14 @@ export type {
   HumanGateEvent
 } from './humanGate'
 
-export type { OrderStartResult, OrderSyncOrder, OrderSyncPlan } from './orders'
+export type {
+  OrderListItem,
+  OrderListQuery,
+  OrderListResult,
+  OrderStartResult,
+  OrderSyncOrder,
+  OrderSyncPlan
+} from './orders'
 
 export type {
   ProductDownloadResult,

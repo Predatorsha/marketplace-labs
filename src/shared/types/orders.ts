@@ -38,6 +38,40 @@ export type OrderSyncPlan = {
   packages_refreshed: number
 }
 
+/** Карточка заказа в списке на странице Orders. */
+export type OrderListItem = {
+  id: number
+  platform: string
+  /** Номер заказа на маркетплейсе. */
+  order_id: string
+  /** Статус как на маркетплейсе, например "Delivered on Jun 14, 2026". */
+  status: string | null
+  /** ISO-дата оформления (YYYY-MM-DD). */
+  ordered_at: string | null
+  /**
+   * Сумма позиций для отображения (например "€23.15").
+   * null — цены позиций не распарсились или в заказе смешаны валюты.
+   */
+  total: string | null
+  items_count: number
+  /** Обложки товаров позиций как `ml-media://…`, максимум 3. */
+  item_covers: string[]
+}
+
+export type OrderListQuery = {
+  page?: number
+  page_size?: number
+}
+
+export type OrderListResult = {
+  ok: boolean
+  items?: OrderListItem[]
+  total?: number
+  page?: number
+  page_size?: number
+  error?: string
+}
+
 export type OrderStartResult =
   | {
       ok: false

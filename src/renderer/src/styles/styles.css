@@ -1075,6 +1075,161 @@ select.info-input {
   }
 }
 
+/* ——— Orders ——— */
+
+.orders-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.orders-sync-btn {
+  flex: 0 0 auto;
+}
+
+.orders-note {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.orders-note.error {
+  color: #c0392b;
+}
+
+/* Плашки как на макете: почти квадратные, не шире 380px — колонок столько,
+   сколько влезает, карточка никогда не растягивается на полэкрана. */
+.orders-grid {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 380px));
+  justify-content: center;
+}
+
+/* Карточка пока не открывает деталку — без hover-лифта и pointer.
+   Отступы щедрее, чем в каталоге, — плашка выходит почти квадратной. */
+.catalog-card.order-card {
+  cursor: default;
+  gap: 14px;
+  padding: 14px 16px 12px;
+}
+
+.catalog-card.order-card:hover:not(:disabled) {
+  transform: none;
+}
+
+.order-card-number {
+  padding: 10px 12px;
+  border-image: url("../assets/border-simple.svg") calc(100% * 10 / 65) / 5px / 0 round;
+  background: rgba(255, 255, 255, 0.65);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-card-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.order-card-platform {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: var(--pink-100);
+  border: 1px solid var(--pink-200);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--pink-600);
+  line-height: 1.4;
+}
+
+.order-card-date {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.order-card-total-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.order-card-total-label {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.order-card-total-price {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--pink-700);
+  white-space: nowrap;
+}
+
+.order-card-thumbs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* Миниатюра в белой рамке с воздухом — как плашки товаров на макете. */
+.order-card-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 5px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--pink-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.order-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
+}
+
+.order-card-thumb-noimg {
+  font-size: 0.62rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.order-card-thumb-more {
+  position: absolute;
+  inset: 5px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 240, 246, 0.72);
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--pink-700);
+}
+
+@media (max-width: 420px) {
+  .orders-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .preview-mascot {
   position: absolute;
   right: 10px;

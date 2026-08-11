@@ -10,6 +10,8 @@ export type OrderItemPayload = {
   unit_price?: number | null
   currency?: string | null
   price?: string | number | null
+  /** true — бесплатный подарок к заказу ("Free" вместо цены); unit_price станет 0. */
+  is_gift?: boolean | null
   sku?: string | null
   url?: string | null
   /**

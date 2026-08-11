@@ -135,6 +135,53 @@ async function orderListState(page: Page): Promise<{ count: number; hasMore: boo
   })
 }
 
+/**
+ * «Устаканивает» список перед вердиктом о дне: кнопка "View more" рендерится
+ * позже карточек и лениво (ниже вьюпорта), поэтому сразу после появления
+ * первых карточек её в DOM ещё нет и orderListState видит ложное «дно».
+ * Скроллим окно к концу списка и ждём кнопку либо рост числа карточек;
+ * дно признаём только после LIST_SETTLE_ROUNDS тихих раундов подряд.
+ */
+const LIST_SETTLE_ROUNDS = 3
+const LIST_SETTLE_TIMEOUT = 4_000
+
+async function settleOrderList(page: Page): Promise<{ count: number; hasMore: boolean }> {
+  let state = await orderListState(page)
+  let quiet = 0
+  while (!state.hasMore && quiet < LIST_SETTLE_ROUNDS) {
+    await page
+      .evaluate(() => {
+        const root = document.querySelector('#TabListWrapperDOMId')
+        const labels = root ? Array.from(root.querySelectorAll('span')) : []
+        const last = labels.filter((s) => (s.textContent || '').trim() === 'Order ID:').pop()
+        last?.scrollIntoView({ block: 'end' })
+        window.scrollTo(0, document.body.scrollHeight)
+      })
+      .catch(() => undefined)
+    const prev = state.count
+    await page
+      .waitForFunction(
+        (prevCount) => {
+          const root = document.querySelector('#TabListWrapperDOMId')
+          if (!root) return false
+          const count = Array.from(root.querySelectorAll('span')).filter(
+            (s) => (s.textContent || '').trim() === 'Order ID:'
+          ).length
+          if (count > prevCount) return true
+          return Array.from(root.querySelectorAll('[role="button"]')).some(
+            (b) => ((b as HTMLElement).innerText || '').trim() === 'View more'
+          )
+        },
+        prev,
+        { timeout: LIST_SETTLE_TIMEOUT }
+      )
+      .catch(() => undefined)
+    state = await orderListState(page)
+    quiet = state.count > prev ? 0 : quiet + 1
+  }
+  return state
+}
+
 /** Кликает "View more"; false — кнопки нет (дно списка). */
 async function clickViewMore(page: Page): Promise<boolean> {
   const btn = page
@@ -229,7 +276,7 @@ async function openTemuOrderDetailViaList(page: Page, orderId: string): Promise<
       return false
     }
 
-    const state = await orderListState(page)
+    const state = await settleOrderList(page)
     if (!state.hasMore) return false
     if (!(await clickViewMore(page))) return false
     await waitForMoreOrders(page, state.count)
@@ -392,10 +439,13 @@ export const temuOrderListService: OrderListService = {
         return { orders: cards.map(toDiscovered), reachedEnd: false }
       }
 
-      const { hasMore } = await orderListState(page)
-      if (!hasMore) {
-        jobLog(`temu orders: reached list bottom (${cards.length} cards)`)
-        return { orders: cards.map(toDiscovered), reachedEnd: true }
+      const settled = await settleOrderList(page)
+      if (!settled.hasMore) {
+        // За время устаканивания могли дорендериться карточки — перечитываем.
+        const finalCards =
+          settled.count > cards.length ? await extractTemuOrderCards(page) : cards
+        jobLog(`temu orders: reached list bottom (${finalCards.length} cards)`)
+        return { orders: finalCards.map(toDiscovered), reachedEnd: true }
       }
 
       const clicked = await clickViewMore(page)
@@ -514,6 +564,7 @@ export const temuOrderListService: OrderListService = {
           title: it.title,
           quantity: it.quantity ?? goodsNum,
           price: it.price,
+          is_gift: it.is_gift,
           sku: it.variant,
           line_number: it.line_number,
           url: it.product_url,
