@@ -12,6 +12,11 @@ export type OrderItemPayload = {
   price?: string | number | null
   sku?: string | null
   url?: string | null
+  /**
+   * Миниатюра позиции с деталки заказа (транзитное поле, в БД не пишется):
+   * фолбэк-фото карточки для товаров, удалённых с маркетплейса.
+   */
+  image?: string | null
 }
 
 export type PackagePayload = {

@@ -74,12 +74,21 @@ export function getProductChoicePrices(db: CatalogDb, productId: number): string
 }
 
 export function getProductChoices(db: CatalogDb, productId: number): ProductChoiceRow[] {
-  return db
+  const rows = db
     .prepare(
-      `SELECT rel_path, name, group_name, price, sort_order
+      `SELECT rel_path, name, group_name, price, sold_out, sort_order
        FROM product_choices WHERE product_id = ? ORDER BY sort_order ASC, id ASC`
     )
-    .all(productId) as ProductChoiceRow[]
+    .all(productId) as Array<{
+    rel_path: string
+    name: string | null
+    group_name: string | null
+    price: string
+    sold_out: number
+    sort_order: number
+  }>
+  // SQLite отдаёт sold_out как 0/1.
+  return rows.map((r) => ({ ...r, sold_out: Boolean(r.sold_out) }))
 }
 
 export function getProductImages(db: CatalogDb, productId: number): ProductImageRow[] {
@@ -148,6 +157,7 @@ export function setProductChoices(
       name: normalizeTextField(c.name),
       group_name: normalizeTextField(c.group_name),
       price,
+      sold_out: c.sold_out === true,
       sort_order: c.sort_order ?? i
     })
   }
@@ -157,11 +167,19 @@ export function setProductChoices(
 
   db.prepare(`DELETE FROM product_choices WHERE product_id = ?`).run(productId)
   const insert = db.prepare(
-    `INSERT INTO product_choices (product_id, sort_order, rel_path, name, group_name, price)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO product_choices (product_id, sort_order, rel_path, name, group_name, price, sold_out)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   )
   for (const c of normalized) {
-    insert.run(productId, c.sort_order ?? 0, c.rel_path, c.name, c.group_name, c.price)
+    insert.run(
+      productId,
+      c.sort_order ?? 0,
+      c.rel_path,
+      c.name,
+      c.group_name,
+      c.price,
+      c.sold_out ? 1 : 0
+    )
   }
 }
 
@@ -415,6 +433,7 @@ function parseChoicesFromProduct(product: Record<string, unknown>): ProductChoic
           name: normalizeTextField(row.name),
           group_name: normalizeTextField(row.group),
           price,
+          sold_out: row.sold_out === true,
           sort_order: i
         })
       }
@@ -458,7 +477,7 @@ function parseSpecsFromProduct(product: Record<string, unknown>): ProductSpecRow
  * Expected `product` fields: product_id (required), title, url, purpose,
  * pack_quantity, tags, rating, review_count, description,
  * orders, seller_*, store_url, video, specs,
- * local_files.images (string[]), local_files.choices ({ file, name, group, price }[]).
+ * local_files.images (string[]), local_files.choices ({ file, name, group, price, sold_out }[]).
  * At least one choice with a price is required.
  *
  * Called from scrapeProduct (scrape/index.ts) after scrape + disk save.

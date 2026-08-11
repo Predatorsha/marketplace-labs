@@ -21,6 +21,8 @@ export function connect(cfg: AppConfig): CatalogDb {
   mkdirSync(dirname(path), { recursive: true })
   const db = new DatabaseSync(path)
   db.exec('PRAGMA foreign_keys = ON')
+  // SCHEMA_SQL — единый инит; migrateCatalogSchema — миграции поверх него
+  // (сейчас пусто: данные тестовые, изменение схемы = снос catalog.sqlite).
   if (!initializedDbPaths.has(path)) {
     db.exec(SCHEMA_SQL)
     migrateCatalogSchema(db, cfg)

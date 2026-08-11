@@ -197,14 +197,21 @@ const ITEM_ANCHOR = 'div[role="button"][aria-label^="item picture"]'
  * быстрой корзины поверх — URL берём и сразу уходим назад/закрываем попап,
  * само скачивание потом идёт прямым goto (модалка при этом не появляется).
  * Товар удалён с Temu → клик никуда не ведёт → null.
+ * `skip` — индексы позиций, URL которых уже известен из БД: их не кликаем,
+ * в результате у них null (caller подставляет URL сам).
  */
 export async function collectTemuOrderItemUrls(
   page: Page,
-  itemCount: number
+  itemCount: number,
+  skip?: ReadonlySet<number>
 ): Promise<Array<string | null>> {
   const urls: Array<string | null> = []
 
   for (let i = 0; i < itemCount; i++) {
+    if (skip?.has(i)) {
+      urls.push(null)
+      continue
+    }
     const anchors = page.locator(ITEM_ANCHOR)
     if ((await anchors.count()) <= i) {
       urls.push(null)

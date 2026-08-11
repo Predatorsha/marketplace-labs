@@ -7,7 +7,7 @@ import { saveScrapedProductToDisk } from '../products/files'
 import type { ProductDownloadResult } from '../../shared/types'
 import { ALIEXPRESS_IMAGE_REFERER } from './aliexpress/product'
 import { scrapeProductPage } from './product'
-import { TEMU_IMAGE_REFERER } from './temu/product'
+import { TEMU_IMAGE_REFERER, type TemuOrderHint } from './temu/product'
 import { resolveTemuSellerStore } from './temu/seller'
 import { parseProductUrl, type ParsedProductUrl } from './url'
 
@@ -53,15 +53,41 @@ export async function scrapeProduct(
 export async function downloadProductWithPage(
   cfg: AppConfig,
   page: Page,
-  parsed: ParsedProductUrl
+  parsed: ParsedProductUrl,
+  opts?: {
+    /** Данные позиции заказа — фолбэк для sold-out / удалённых карточек. */
+    orderHint?: TemuOrderHint
+    /**
+     * Мёртвый листинг («discontinued») не сохранять: вернуть ok + dead_listing,
+     * чтобы вызывающий поставил товар в очередь ретраев. Без флага фолбэк-карточка
+     * сохраняется сразу (поведение одиночного скрейпа).
+     */
+    deferDeadListing?: boolean
+  }
 ): Promise<ProductDownloadResult> {
   try {
     // Navigation + platform auth HumanGate happen inside scrapeProductPage (Temu → ensureTemuLoggedIn).
     const scraped = await scrapeProductPage(page, {
       platform: parsed.platform,
       url: parsed.url,
-      productId: parsed.productId
+      productId: parsed.productId,
+      orderHint: opts?.orderHint
     })
+
+    if (scraped.dead_listing && opts?.deferDeadListing) {
+      jobLog(
+        `scrape dead listing deferred platform=${parsed.platform} product_id=${scraped.product_id}`
+      )
+      return {
+        ok: true,
+        platform: parsed.platform,
+        product_id: scraped.product_id,
+        title: scraped.title ?? null,
+        url: scraped.url ?? parsed.url,
+        status: 'archived',
+        dead_listing: true
+      }
+    }
 
     // Unavailable PDP: flip catalog status only (no gallery/price to save).
     if (scraped.status === 'archived' && !scraped.choices?.length) {
@@ -86,7 +112,8 @@ export async function downloadProductWithPage(
         folder: applied.folder ?? undefined,
         title: applied.title,
         url: applied.url,
-        status: applied.status
+        status: applied.status,
+        dead_listing: scraped.dead_listing || undefined
       }
     }
 
@@ -98,7 +125,8 @@ export async function downloadProductWithPage(
     })
 
     // Temu: click store icon in the same tab, capture store_url + mall_id.
-    if (parsed.platform === 'temu') {
+    // Снапшот sold-out товара перехода в магазин не имеет — не пытаемся.
+    if (parsed.platform === 'temu' && scraped.status !== 'archived') {
       const store = await resolveTemuSellerStore(page)
       if (store.storeUrl && store.sellerId) {
         saved.product.store_url = store.storeUrl
@@ -144,7 +172,8 @@ export async function downloadProductWithPage(
       my_rating,
       price,
       tags,
-      status: scraped.status ?? 'active'
+      status: scraped.status ?? 'active',
+      dead_listing: scraped.dead_listing || undefined
     }
   } catch (exc) {
     const message = exc instanceof Error ? exc.message : String(exc)

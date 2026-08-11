@@ -42,11 +42,31 @@ export async function extractTemuReviews(
       if (digits) reviewCount = digits
     }
 
+    // Рейтинг — только из aria-label «4.9 out of five stars» у блока звёзд.
+    // Первое число innerText — это счётчик («2.774 reviews»), его цифры
+    // утекали в рейтинг; текстовый спан рядом локализован («4,9»).
     let rating: string | null = null
-    const rate = text.match(/\b(\d(?:[.,]\d)?)\s*(?:\/\s*5)?\b/)
-    if (rate) {
-      const n = Number(rate[1].replace(',', '.'))
-      if (Number.isFinite(n) && n >= 0 && n <= 5) rating = String(n)
+    for (const el of Array.from(root.querySelectorAll('[aria-label]'))) {
+      const label = el.getAttribute('aria-label') || ''
+      const m = label.match(/(\d(?:[.,]\d+)?)\s*out of five stars/i)
+      if (!m) continue
+      const n = Number(m[1].replace(',', '.'))
+      if (Number.isFinite(n) && n >= 0 && n <= 5) {
+        rating = String(n)
+        break
+      }
+    }
+    if (rating === null) {
+      // Фолбэк для разметки без aria-label: убираем счётчик из текста,
+      // дальше первое одиночное число ≤ 5 (десятичное или «N/5»).
+      const withoutCount = rev ? text.replace(rev[0], ' ') : text
+      for (const m of withoutCount.matchAll(/\b(\d(?:[.,]\d)?)\s*(?:\/\s*5)?\b/g)) {
+        const n = Number(m[1].replace(',', '.'))
+        if (Number.isFinite(n) && n >= 0 && n <= 5) {
+          rating = String(n)
+          break
+        }
+      }
     }
 
     return { reviewCount, rating }

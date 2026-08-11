@@ -164,7 +164,8 @@ export async function getProduct(cfg: AppConfig, key: ProductKey): Promise<Produ
         file: c.file,
         name: c.name,
         group: c.group,
-        price: c.price
+        price: c.price,
+        sold_out: c.sold_out
       }))
       const archived_photo_sets = countArchivedSnapshots(folderAbs)
       return {

@@ -163,6 +163,67 @@ export function productHasFolder(
   }
 }
 
+/**
+ * Нормализация названия товара для матчинга позиций заказа с карточками БД.
+ * Слишком короткие названия (< 10 знаков) не матчим — велик шанс совпадения
+ * разных товаров.
+ */
+export function normalizeProductTitle(raw: string | null | undefined): string | null {
+  const t = String(raw || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+  return t.length >= 10 ? t : null
+}
+
+/**
+ * normalized title → URL карточки для известных товаров платформы.
+ * Два источника: products.title (текст PDP) и order_items.title уже синкнутых
+ * заказов (текст деталки — он байт-в-байт совпадает у повторных покупок).
+ * Название, за которым числятся разные товары, выбрасывается: по нему
+ * матчить нельзя.
+ */
+export function listProductUrlsByTitle(cfg: AppConfig, platform: string): Map<string, string> {
+  const plat = platform.trim().toLowerCase()
+  const db = connect(cfg)
+  try {
+    const rows = [
+      ...db
+        .prepare(
+          `SELECT title, url, marketplace_product_id AS pid FROM products
+            WHERE platform = ? AND title IS NOT NULL
+              AND url IS NOT NULL AND TRIM(url) != ''`
+        )
+        .all(plat),
+      ...db
+        .prepare(
+          `SELECT oi.title AS title, p.url AS url, p.marketplace_product_id AS pid
+             FROM order_items oi JOIN products p ON p.id = oi.product_id
+            WHERE p.platform = ? AND oi.title IS NOT NULL
+              AND p.url IS NOT NULL AND TRIM(p.url) != ''`
+        )
+        .all(plat)
+    ] as Array<{ title: string; url: string; pid: string }>
+
+    const byTitle = new Map<string, { url: string; pid: string }>()
+    const ambiguous = new Set<string>()
+    for (const r of rows) {
+      const key = normalizeProductTitle(r.title)
+      if (!key || ambiguous.has(key)) continue
+      const prev = byTitle.get(key)
+      if (!prev) {
+        byTitle.set(key, { url: r.url, pid: String(r.pid) })
+      } else if (prev.pid !== String(r.pid)) {
+        byTitle.delete(key)
+        ambiguous.add(key)
+      }
+    }
+    return new Map([...byTitle].map(([k, v]) => [k, v.url]))
+  } finally {
+    db.close()
+  }
+}
+
 function upsertOrder(
   db: CatalogDb,
   opts: {

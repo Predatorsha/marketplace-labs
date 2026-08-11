@@ -1,7 +1,7 @@
 import type { Page } from 'playwright'
 import type { MarketplacePlatform } from './url'
 import { scrapeAliExpressProductPage } from './aliexpress/product'
-import { scrapeTemuProductPage } from './temu/product'
+import { scrapeTemuProductPage, type TemuOrderHint } from './temu/product'
 
 /**
  * Raw product payload produced by Playwright scrapers.
@@ -14,6 +14,8 @@ export type ScrapedChoiceDraft = {
   name?: string | null
   group?: string | null
   price: string
+  /** Вариант распродан («Sold out» в буй-боксе); price тогда — общая цена страницы. */
+  sold_out?: boolean
 }
 
 export type ScrapedProduct = {
@@ -37,6 +39,12 @@ export type ScrapedProduct = {
    * `archived` = unavailable for purchase; `active` = normal buyable page.
    */
   status?: 'active' | 'archived'
+  /**
+   * Листинг мёртв («discontinued»/unavailable): карточка не собрана с живой
+   * страницы, только фолбэк из данных заказа. Такое бывает временным глюком
+   * Temu — кандидат на ретрай в конце прогона синка заказов.
+   */
+  dead_listing?: boolean
   /** Remote gallery URLs (excludes choice image). Consumed by saveScrapedProductToDisk. */
   gallery_image_urls?: string[]
   /** Choice drafts before disk save, in buy-box radio order. */
@@ -51,6 +59,7 @@ export type ScrapedProduct = {
       name?: string | null
       group?: string | null
       price: string
+      sold_out?: boolean
     }>
   }
 }
@@ -60,10 +69,20 @@ export type ScrapedProduct = {
  */
 export async function scrapeProductPage(
   page: Page,
-  opts: { platform: MarketplacePlatform; url: string; productId: string }
+  opts: {
+    platform: MarketplacePlatform
+    url: string
+    productId: string
+    /** Данные позиции заказа — фолбэк для sold-out / удалённых карточек. */
+    orderHint?: TemuOrderHint
+  }
 ): Promise<ScrapedProduct> {
   if (opts.platform === 'temu') {
-    return scrapeTemuProductPage(page, { url: opts.url, productId: opts.productId })
+    return scrapeTemuProductPage(page, {
+      url: opts.url,
+      productId: opts.productId,
+      orderHint: opts.orderHint
+    })
   }
   if (opts.platform === 'aliexpress') {
     return scrapeAliExpressProductPage(page, { url: opts.url, productId: opts.productId })

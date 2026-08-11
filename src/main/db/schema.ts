@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS product_choices (
   rel_path TEXT NOT NULL DEFAULT '',
   name TEXT,
   group_name TEXT,
-  price TEXT NOT NULL
+  price TEXT NOT NULL,
+  sold_out INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS tags (

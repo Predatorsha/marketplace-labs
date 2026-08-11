@@ -3,6 +3,8 @@ export type ProductChoiceRow = {
   name: string | null
   group_name: string | null
   price: string
+  /** Вариант распродан на маркетплейсе (в БД 0/1). */
+  sold_out?: boolean
   sort_order?: number
 }
 

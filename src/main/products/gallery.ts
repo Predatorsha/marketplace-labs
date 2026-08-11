@@ -79,6 +79,7 @@ export type ResolvedChoice = {
   name: string | null
   group: string | null
   price: string
+  sold_out: boolean
 }
 
 /** Choice rows from DB; paths resolved under the active snapshot. */
@@ -102,7 +103,8 @@ export async function resolveChoiceItems(
       file: rel,
       name: row.name,
       group: row.group_name,
-      price: row.price
+      price: row.price,
+      sold_out: Boolean(row.sold_out)
     })
   }
   return out

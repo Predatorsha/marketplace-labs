@@ -288,7 +288,8 @@ export async function saveScrapedProductToDisk(
         file: choiceRels[i],
         name: c.name ?? null,
         group: c.group ?? null,
-        price: c.price.trim()
+        price: c.price.trim(),
+        sold_out: c.sold_out ?? false
       }))
     }
   }

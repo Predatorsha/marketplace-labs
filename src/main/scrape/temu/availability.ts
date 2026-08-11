@@ -10,3 +10,17 @@ export async function isTemuProductUnavailable(page: Page): Promise<boolean> {
     )
   })
 }
+
+/**
+ * Снятый с продажи товар: вместо буй-бокса страница показывает миниатюру,
+ * «This item is sold out. View more details» и грид Similar items.
+ * Данные карточки при этом живы на goods_snapshot.html.
+ * Точную фразу не путаем с "almost sold out" в сайдбаре корзины.
+ */
+export async function isTemuProductSoldOut(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const text = (document.body?.innerText || '').slice(0, 20_000)
+    if (!/this item is sold out/i.test(text)) return false
+    return !document.querySelector('#rightContent')
+  })
+}

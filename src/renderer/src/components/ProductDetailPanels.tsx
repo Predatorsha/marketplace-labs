@@ -391,16 +391,21 @@ export default function ProductDetailPanels({
                       <button
                         key={`${choice.file}-${idx}`}
                         type="button"
-                        className={`preview-thumb${choiceIndex === idx ? ' active' : ''}`}
+                        className={`preview-thumb${choiceIndex === idx ? ' active' : ''}${choice.sold_out ? ' sold-out' : ''}`}
                         onClick={() => setChoiceIndex(idx)}
                         aria-label={choice.name || `Choice ${idx + 1}`}
-                        title={`${choice.name || 'Choice'}: ${choice.price}`}
+                        title={`${choice.name || 'Choice'}: ${choice.price}${choice.sold_out ? ' — продан' : ''}`}
                       >
                         {choice.url ? (
                           <img src={choice.url} alt="" />
                         ) : (
                           <span className="preview-thumb-label">{choice.price}</span>
                         )}
+                        {choice.sold_out ? (
+                          <span className="preview-thumb-soldout" aria-hidden="true">
+                            ✕
+                          </span>
+                        ) : null}
                       </button>
                     ))}
                   </div>

@@ -1,5 +1,6 @@
 import type { Page } from 'playwright'
 import { ensureTemuLoggedIn } from '../../browser/auth/temu'
+import { normalizeProductTitle } from '../../code/orders'
 import type { OrderPayload } from '../../db/models/order'
 import { jobLog } from '../../jobs/log'
 import type { DiscoveredOrder, OrderListDiscovery, OrderListService } from '../orders'
@@ -384,11 +385,6 @@ export const temuOrderListService: OrderListService = {
       const cards = await extractTemuOrderCards(page)
       const oldest = cards[cards.length - 1]
 
-      if (opts.maxOrders && cards.length >= opts.maxOrders) {
-        jobLog(`temu orders: maxOrders=${opts.maxOrders} reached (${cards.length} cards visible)`)
-        return { orders: cards.map(toDiscovered), reachedEnd: false }
-      }
-
       if (oldest && opts.shouldStop(toDiscovered(oldest))) {
         jobLog(
           `temu orders: stop at known final order ${oldest.order_id} (${cards.length} cards visible)`
@@ -431,8 +427,11 @@ export const temuOrderListService: OrderListService = {
    * Скачивает деталку одного заказа: сначала прямой URL bgt_order_detail.html,
    * при неудаче — клик по карточке из списка. Из деталки собирает позиции и
    * кликами снимает URL карточек товаров (null = товар удалён с Temu).
+   * Позиции, чей title сматчился с известным товаром БД (opts.productUrlByTitle),
+   * получают URL без клика. У таких позиций нет _oak_order_sn из кликового URL —
+   * marketplace_item_id пуст, апсерт позиций падает на фолбэк line:N.
    */
-  async fetchOrder(page, order): Promise<OrderPayload | null> {
+  async fetchOrder(page, order, opts): Promise<OrderPayload | null> {
     const orderId = order.marketplace_order_id
 
     if (!(await openTemuOrderDetail(page, orderId))) {
@@ -450,14 +449,30 @@ export const temuOrderListService: OrderListService = {
       return null
     }
 
-    const urls = await collectTemuOrderItemUrls(page, detail.items.length)
+    // Позиции с известным по БД товаром: URL из карты, клик не нужен.
+    const known = opts?.productUrlByTitle
+    const prefilled = new Map<number, string>()
+    if (known?.size) {
+      for (let i = 0; i < detail.items.length; i++) {
+        const key = normalizeProductTitle(detail.items[i].title)
+        const url = key ? known.get(key) : undefined
+        if (url) prefilled.set(i, url)
+      }
+    }
+
+    const urls = await collectTemuOrderItemUrls(
+      page,
+      detail.items.length,
+      new Set(prefilled.keys())
+    )
     for (let i = 0; i < detail.items.length; i++) {
-      detail.items[i].product_url = urls[i] ?? null
+      detail.items[i].product_url = prefilled.get(i) ?? urls[i] ?? null
     }
     const deadItems = detail.items.filter((it) => !it.product_url).length
     jobLog(
       `temu order ${orderId}: ${detail.items.length} items, ` +
-        `${detail.items.length - deadItems} with product url, ${deadItems} deleted/unresolved`
+        `${detail.items.length - deadItems} with product url` +
+        ` (${prefilled.size} from db without click), ${deadItems} deleted/unresolved`
     )
 
     // Посылки: клики по позициям вернули нас на деталку — кнопка Track order здесь.
@@ -501,7 +516,8 @@ export const temuOrderListService: OrderListService = {
           price: it.price,
           sku: it.variant,
           line_number: it.line_number,
-          url: it.product_url
+          url: it.product_url,
+          image: it.image
         }
       })
     }

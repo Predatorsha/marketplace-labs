@@ -12,6 +12,8 @@ export type ProductDownloadResult = {
   price?: string | null
   tags?: string[]
   status?: string | null
+  /** Листинг мёртв на маркетплейсе — карточка (если есть) собрана из данных заказа. */
+  dead_listing?: boolean
   error?: string
 }
 
@@ -42,6 +44,8 @@ export type ProductChoiceItem = {
   group: string | null
   /** Choice price (source of truth). */
   price: string
+  /** Вариант распродан на маркетплейсе (цена тогда — общая со страницы). */
+  sold_out?: boolean
 }
 
 export type ProductCard = {

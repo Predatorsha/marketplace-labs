@@ -31,8 +31,13 @@ export async function collectTemuGallery(page: Page): Promise<TemuGallery> {
       const img = li.querySelector('img')
       let src = img ? img.currentSrc || img.src : ''
       if (!src || src.startsWith('data:')) {
-        // Lazy slide not loaded yet — same asset sits in the inline
-        // background-image of the slide div (smaller variant, query differs).
+        // Lazy slide not shown yet: src is a data:gif placeholder and the
+        // real URL sits in data-src (never-shown slides stay like this).
+        src = img?.getAttribute('data-src') || ''
+      }
+      if (!src || src.startsWith('data:')) {
+        // Same asset sits in the inline background-image of the slide div
+        // (smaller variant, query differs).
         const bgEl = li.querySelector<HTMLElement>('[style*="background-image"]')
         const m = bgEl
           ? /url\(["']?([^"')]+)["']?\)/.exec(bgEl.style.backgroundImage)
