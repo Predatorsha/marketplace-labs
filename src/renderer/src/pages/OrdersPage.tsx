@@ -140,7 +140,7 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
         ) : !items.length ? (
           <div className="catalog-empty">No orders yet. Press “Sync Orders” to fetch them.</div>
         ) : (
-          <div className="catalog-grid orders-grid">
+          <div className="catalog-grid">
             {items.map((order) => {
               const thumbCount = Math.min(3, Math.max(order.items_count, order.item_covers.length))
               const hiddenItems = order.items_count - thumbCount

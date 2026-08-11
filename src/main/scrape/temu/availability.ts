@@ -12,6 +12,17 @@ export async function isTemuProductUnavailable(page: Page): Promise<boolean> {
 }
 
 /**
+ * Снапшот (goods_snapshot.html) иногда показывает «This item was discontinued»
+ * вместо данных товара — бывает временным глюком Temu, кандидат на ретрай.
+ */
+export async function isTemuSnapshotDiscontinued(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const text = (document.body?.innerText || '').slice(0, 12_000)
+    return /this item (was|has been|is) discontinued/i.test(text)
+  })
+}
+
+/**
  * Снятый с продажи товар: вместо буй-бокса страница показывает миниатюру,
  * «This item is sold out. View more details» и грид Similar items.
  * Данные карточки при этом живы на goods_snapshot.html.

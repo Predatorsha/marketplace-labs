@@ -40,9 +40,8 @@ export type ScrapedProduct = {
    */
   status?: 'active' | 'archived'
   /**
-   * Листинг мёртв («discontinued»/unavailable): карточка не собрана с живой
-   * страницы, только фолбэк из данных заказа. Такое бывает временным глюком
-   * Temu — кандидат на ретрай в конце прогона синка заказов.
+   * Листинг мёртв (unavailable/discontinued): карточка не собрана с живой
+   * страницы, только фолбэк из данных заказа.
    */
   dead_listing?: boolean
   /** Remote gallery URLs (excludes choice image). Consumed by saveScrapedProductToDisk. */

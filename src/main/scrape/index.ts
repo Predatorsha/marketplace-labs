@@ -57,12 +57,6 @@ export async function downloadProductWithPage(
   opts?: {
     /** Данные позиции заказа — фолбэк для sold-out / удалённых карточек. */
     orderHint?: TemuOrderHint
-    /**
-     * Мёртвый листинг («discontinued») не сохранять: вернуть ok + dead_listing,
-     * чтобы вызывающий поставил товар в очередь ретраев. Без флага фолбэк-карточка
-     * сохраняется сразу (поведение одиночного скрейпа).
-     */
-    deferDeadListing?: boolean
   }
 ): Promise<ProductDownloadResult> {
   try {
@@ -73,21 +67,6 @@ export async function downloadProductWithPage(
       productId: parsed.productId,
       orderHint: opts?.orderHint
     })
-
-    if (scraped.dead_listing && opts?.deferDeadListing) {
-      jobLog(
-        `scrape dead listing deferred platform=${parsed.platform} product_id=${scraped.product_id}`
-      )
-      return {
-        ok: true,
-        platform: parsed.platform,
-        product_id: scraped.product_id,
-        title: scraped.title ?? null,
-        url: scraped.url ?? parsed.url,
-        status: 'archived',
-        dead_listing: true
-      }
-    }
 
     // Unavailable PDP: flip catalog status only (no gallery/price to save).
     if (scraped.status === 'archived' && !scraped.choices?.length) {

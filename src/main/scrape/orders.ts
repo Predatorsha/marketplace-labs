@@ -16,7 +16,7 @@ import type { OrderSyncOrder, OrderSyncPlan } from '../../shared/types'
 import { downloadProductWithPage } from './index'
 import { temuOrderListService } from './temu/orders'
 import type { TemuOrderHint } from './temu/product'
-import { parseProductUrl, type MarketplacePlatform, type ParsedProductUrl } from './url'
+import { parseProductUrl, type MarketplacePlatform } from './url'
 
 /** Заказ, увиденный сервисом в списке заказов маркетплейса. */
 export type DiscoveredOrder = OrderSyncOrder
@@ -161,13 +161,6 @@ export async function syncOrders(
       let ordersFailed = 0
       let productsScraped = 0
       let productsFailed = 0
-      // Мёртвые листинги («discontinued») — бывает временный глюк Temu.
-      // Сохранение фолбэк-карточки откладываем: в конце прогона очередь
-      // ретраится по кругу, и только после последнего круга пишем фолбэк.
-      const deadRetryQueue: Array<{
-        parsed: ParsedProductUrl
-        hint: TemuOrderHint
-      }> = []
       // Товар обрабатываем один раз за прогон, даже если встречается в нескольких заказах.
       const handledProducts = new Set<string>()
       // Известные товары из БД: сматченные по названию позиции получают URL
@@ -182,7 +175,7 @@ export async function syncOrders(
       // ВРЕМЕННЫЙ кап на прогон: качаем только первые N заказов очереди
       // (самые старые). Недокачанные не попадают в БД и вернутся в to_download
       // при следующем прогоне. Убрать после проверки. — 2026-08-11
-      const MAX_DOWNLOAD_ORDERS = 3
+      const MAX_DOWNLOAD_ORDERS = 1
       const downloadQueue = [...toDownload].reverse().slice(0, MAX_DOWNLOAD_ORDERS)
       if (downloadQueue.length < toDownload.length) {
         jobLog(
@@ -218,16 +211,16 @@ export async function syncOrders(
               variant: item.sku ?? null
             }
             const res = await downloadProductWithPage(cfg, page, parsed, {
-              orderHint: hint,
-              deferDeadListing: true
+              orderHint: hint
             })
-            if (res.ok && res.dead_listing) {
-              deadRetryQueue.push({ parsed, hint })
-              jobLog(
-                `orders sync: product ${parsed.productId} listing is dead, queued for retry`
-              )
-            } else if (res.ok) {
+            if (res.ok) {
               productsScraped += 1
+              if (res.dead_listing) {
+                jobLog(
+                  `orders sync: product ${parsed.productId} listing is dead,` +
+                    ` saved fallback card from order data`
+                )
+              }
               // Свежескачанный товар сразу в карту: его позиции в следующих
               // заказах прогона получат URL без клика.
               const key = normalizeProductTitle(res.title)
@@ -259,64 +252,10 @@ export async function syncOrders(
         }
       }
 
-      // Карусель ретраев мёртвых листингов: до DEAD_RETRY_ROUNDS кругов по
-      // очереди. Ожил — качаем полноценно; после последнего круга всё ещё
-      // мёртв — сохраняем фолбэк-карточку из данных заказа (deferDeadListing off).
-      const DEAD_RETRY_ROUNDS = 5
-      let deadRecovered = 0
-      let deadPermanent = 0
-      if (deadRetryQueue.length) {
-        jobLog(
-          `orders sync: retrying ${deadRetryQueue.length} dead listing(s),` +
-            ` up to ${DEAD_RETRY_ROUNDS} rounds`
-        )
-        let queue = deadRetryQueue
-        for (let round = 1; round <= DEAD_RETRY_ROUNDS && queue.length; round++) {
-          const lastRound = round === DEAD_RETRY_ROUNDS
-          const next: typeof queue = []
-          for (const entry of queue) {
-            const res = await downloadProductWithPage(cfg, page, entry.parsed, {
-              orderHint: entry.hint,
-              deferDeadListing: !lastRound
-            })
-            if (res.ok && !res.dead_listing) {
-              productsScraped += 1
-              deadRecovered += 1
-              jobLog(
-                `orders sync: dead listing ${entry.parsed.productId} recovered` +
-                  ` on retry round ${round}`
-              )
-            } else if (!lastRound) {
-              next.push(entry)
-            } else {
-              // Последний круг: фолбэк сохранён (ok) или скрейп упал совсем.
-              if (res.ok) {
-                productsScraped += 1
-                deadPermanent += 1
-              } else {
-                productsFailed += 1
-              }
-              jobLog(
-                `orders sync: product ${entry.parsed.productId} still dead after` +
-                  ` ${DEAD_RETRY_ROUNDS} rounds` +
-                  (res.ok ? ', saved fallback card from order data' : `: ${res.error ?? 'fail'}`)
-              )
-            }
-          }
-          queue = next
-          // Небольшая пауза между кругами — даём бэкенду Temu шанс отдышаться.
-          if (queue.length && !lastRound) {
-            await new Promise((r) => setTimeout(r, 5000))
-          }
-        }
-      }
-
       jobLog(
         `orders sync done platform=${platform} discovered=${orders.length}` +
           ` to_download=${toDownload.length} synced=${ordersSynced} failed=${ordersFailed}` +
           ` products_scraped=${productsScraped} products_failed=${productsFailed}` +
-          ` dead_retried=${deadRetryQueue.length} dead_recovered=${deadRecovered}` +
-          ` dead_permanent=${deadPermanent}` +
           ` status_updated=${applied} packages_refreshed=${packagesRefreshed}` +
           ` skipped_final=${skippedFinal} skipped_unchanged=${skippedUnchanged}` +
           ` reached_end=${reachedEnd}`

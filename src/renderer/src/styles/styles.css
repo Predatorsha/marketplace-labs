@@ -791,10 +791,14 @@ select.info-input {
   padding: 2px 2px 8px;
 }
 
-/* Страница листается по 6 плашек — сетка 3×2. */
+/* Каталог, как и заказы: 6 плашек на страницу, всегда 3 колонки (3×2),
+   карточка не шире 380px. В узком окне колонки ужимаются, а не переносятся. */
 .catalog-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 380px));
+  justify-content: center;
+  max-width: calc(3 * 380px + 2 * 14px);
+  margin-inline: auto;
   gap: 14px;
 }
 
@@ -1055,11 +1059,13 @@ select.info-input {
   image-rendering: pixelated;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .catalog-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 380px));
   }
+}
 
+@media (max-width: 860px) {
   .catalog-total {
     position: static;
   }
@@ -1067,6 +1073,12 @@ select.info-input {
   .catalog-footer {
     flex-wrap: wrap;
     justify-content: space-between;
+  }
+}
+
+@media (max-width: 560px) {
+  .catalog-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1093,12 +1105,7 @@ select.info-input {
   color: #c0392b;
 }
 
-/* Плашки как на макете: почти квадратные, не шире 380px — колонок столько,
-   сколько влезает, карточка никогда не растягивается на полэкрана. */
-.orders-grid {
-  grid-template-columns: repeat(auto-fill, minmax(300px, 380px));
-  justify-content: center;
-}
+/* Сетка заказов — общая .catalog-grid (3×2, карточки до 380px). */
 
 /* Карточка пока не открывает деталку — без hover-лифта и pointer.
    Отступы щедрее, чем в каталоге, — плашка выходит почти квадратной. */
@@ -1217,12 +1224,6 @@ select.info-input {
   font-size: 0.9rem;
   font-weight: 800;
   color: var(--pink-700);
-}
-
-@media (max-width: 420px) {
-  .orders-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .preview-mascot {

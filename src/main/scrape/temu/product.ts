@@ -3,7 +3,11 @@ import { ensureTemuLoggedIn } from '../../browser/auth/temu'
 import { jobLog } from '../../jobs/log'
 import { normalizeDisplayPrice } from '../price'
 import type { ScrapedChoiceDraft, ScrapedProduct } from '../product'
-import { isTemuProductSoldOut, isTemuProductUnavailable } from './availability'
+import {
+  isTemuProductSoldOut,
+  isTemuProductUnavailable,
+  isTemuSnapshotDiscontinued
+} from './availability'
 import { extractTemuReviews, extractTemuTitle } from './buyBox'
 import { extractTemuDescriptionSpecs, extractTemuSpecs } from './details'
 import { extractTemuDom } from './extract'
@@ -80,10 +84,32 @@ async function scrapeTemuSnapshotPage(
 
   await page
     .waitForFunction(
-      () => document.querySelectorAll('#leftContent ol > li').length > 2,
+      () => {
+        const t = document.body?.innerText || ''
+        return (
+          /this item (was|has been|is) discontinued/i.test(t) ||
+          document.querySelectorAll('#leftContent ol > li').length > 2
+        )
+      },
       { timeout: 20_000 }
     )
     .catch(() => undefined)
+
+  // «This item was discontinued» вместо снапшота: данных не будет — сразу
+  // фолбэк-карточка из данных заказа (раньше тут падало «no gallery images»).
+  if (await isTemuSnapshotDiscontinued(page)) {
+    jobLog(`temu product ${opts.productId}: snapshot shows discontinued`)
+    const fromOrder = opts.orderHint
+      ? buildTemuProductFromOrderHint(opts, opts.orderHint)
+      : null
+    if (fromOrder) return fromOrder
+    return {
+      product_id: opts.productId,
+      url: opts.url,
+      status: 'archived',
+      dead_listing: true
+    }
+  }
 
   // Слайды рейла дорисовываются пачками — ждём, пока их число перестанет расти,
   // иначе снимем только первые 2 фотки.
