@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   HumanGateEvent,
+  OrderGetResult,
   OrderListQuery,
   OrderListResult,
   OrderStartResult,
@@ -20,6 +21,8 @@ const api = {
 
   listOrders: (query?: OrderListQuery): Promise<OrderListResult> =>
     ipcRenderer.invoke('orders:list', query || {}),
+
+  getOrder: (id: number): Promise<OrderGetResult> => ipcRenderer.invoke('orders:get', { id }),
 
   continueHumanGate: (gateId: number): Promise<boolean> =>
     ipcRenderer.invoke('orders:humanGateContinue', { gateId }),

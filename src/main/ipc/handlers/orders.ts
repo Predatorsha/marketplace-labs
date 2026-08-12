@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { loadConfig } from '../../config'
 import { resolveHumanGate } from '../../browser/humanGate'
 import { jobLog } from '../../jobs/log'
+import { getOrder } from '../../orders/get'
 import { listOrders } from '../../orders/list'
 import { syncOrders } from '../../scrape/orders'
 import type { OrderListQuery, OrderStartResult } from '../../../shared/types'
@@ -14,6 +15,17 @@ export function registerOrdersHandlers(): void {
     } catch (exc) {
       const message = exc instanceof Error ? exc.message : String(exc)
       jobLog(`[ipc] orders:list fail ${message}`)
+      return { ok: false, error: message }
+    }
+  })
+
+  ipcMain.handle('orders:get', async (_evt, args: { id?: number }) => {
+    const cfg = loadConfig()
+    try {
+      return await getOrder(cfg, Number(args?.id))
+    } catch (exc) {
+      const message = exc instanceof Error ? exc.message : String(exc)
+      jobLog(`[ipc] orders:get fail ${message}`)
       return { ok: false, error: message }
     }
   })

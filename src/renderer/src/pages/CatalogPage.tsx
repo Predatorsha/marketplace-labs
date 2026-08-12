@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type {
-  CatalogListItem,
-  ProductCard,
-  ProductEditableFields
-} from '../../../shared/types'
-import ProductDetailPanels, { productCardToDetails } from '../components/ProductDetailPanels'
+import type { CatalogListItem, ProductCard } from '../../../shared/types'
+import ProductDetailScreen from '../components/ProductDetailScreen'
 import PixelMascot from '../components/PixelMascot'
 import StarRatingDisplay from '../components/StarRatingDisplay'
 import {
@@ -105,39 +101,6 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
     }
   }
 
-  async function onOpenFolder(): Promise<void> {
-    if (!selected?.folder || !window.api?.openPath) return
-    const res = await window.api.openPath(selected.folder)
-    if (!res.ok) onStatus?.(res.error || 'Could not open folder.', 'error')
-  }
-
-  async function onSaveDetails(patch: ProductEditableFields): Promise<boolean> {
-    if (!selected || !window.api?.updateProduct) {
-      onStatus?.('Cannot save: product is not loaded.', 'error')
-      return false
-    }
-    setDetailBusy(true)
-    onStatus?.('Saving…', 'ok')
-    try {
-      const res = await window.api.updateProduct(
-        { platform: selected.platform, product_id: selected.product_id },
-        patch
-      )
-      if (!res.ok || !res.product) {
-        onStatus?.(res.error || 'Could not save product.', 'error')
-        return false
-      }
-      setSelected(res.product)
-      onStatus?.('Saved.', 'ok')
-      return true
-    } catch (exc) {
-      onStatus?.(exc instanceof Error ? exc.message : String(exc), 'error')
-      return false
-    } finally {
-      setDetailBusy(false)
-    }
-  }
-
   function goBack(): void {
     setSelected(null)
     void loadPage(page)
@@ -151,23 +114,19 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
 
   if (selected) {
     return (
-      <div className="catalog-page catalog-detail">
-        <header className="catalog-header">
-          <button type="button" className="btn-ghost catalog-back" onClick={goBack}>
-            ← Back
-          </button>
-          <h1 className="catalog-title">
+      <ProductDetailScreen
+        key={`${selected.platform}:${selected.product_id}`}
+        product={selected}
+        backLabel="Back"
+        heading={
+          <>
             <IconFolder size={20} />
             <span>Catalog</span>
-          </h1>
-        </header>
-        <ProductDetailPanels
-          product={productCardToDetails(selected)}
-          busy={detailBusy}
-          onOpenFolder={() => void onOpenFolder()}
-          onSaveDetails={onSaveDetails}
-        />
-      </div>
+          </>
+        }
+        onBack={goBack}
+        onStatus={onStatus}
+      />
     )
   }
 

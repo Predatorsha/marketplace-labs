@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { OrderListItem } from '../../../shared/types'
+import type {
+  OrderDetail,
+  OrderDetailItem,
+  OrderListItem,
+  ProductCard
+} from '../../../shared/types'
+import OrderDetailView from '../components/OrderDetailView'
 import PixelMascot from '../components/PixelMascot'
+import ProductDetailScreen from '../components/ProductDetailScreen'
 import {
   IconBag,
   IconChevronLeft,
@@ -22,6 +29,9 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [selected, setSelected] = useState<OrderDetail | null>(null)
+  const [product, setProduct] = useState<ProductCard | null>(null)
+  const [detailBusy, setDetailBusy] = useState(false)
   const [note, setNote] = useState('')
   const [noteKind, setNoteKind] = useState<'ok' | 'error'>('ok')
   const onStatusRef = useRef(onStatus)
@@ -95,10 +105,88 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
     }
   }
 
+  async function openOrder(item: OrderListItem): Promise<void> {
+    if (!window.api?.getOrder) {
+      setStatus('Error: app API is not loaded.', 'error')
+      return
+    }
+    setDetailBusy(true)
+    try {
+      const res = await window.api.getOrder(item.id)
+      if (!res.ok || !res.order) {
+        setStatus(res.error || 'Could not open order.', 'error')
+        return
+      }
+      setSelected(res.order)
+    } catch (exc) {
+      setStatus(exc instanceof Error ? exc.message : String(exc), 'error')
+    } finally {
+      setDetailBusy(false)
+    }
+  }
+
+  async function openProduct(item: OrderDetailItem): Promise<void> {
+    if (!selected || !item.product_id) return
+    if (!window.api?.getProduct) {
+      setStatus('Error: app API is not loaded.', 'error')
+      return
+    }
+    setDetailBusy(true)
+    try {
+      const res = await window.api.getProduct({
+        platform: selected.platform,
+        product_id: item.product_id
+      })
+      if (!res.ok || !res.product) {
+        setStatus(res.error || 'Could not open product.', 'error')
+        return
+      }
+      setProduct(res.product)
+    } catch (exc) {
+      setStatus(exc instanceof Error ? exc.message : String(exc), 'error')
+    } finally {
+      setDetailBusy(false)
+    }
+  }
+
+  function goBack(): void {
+    setSelected(null)
+    void loadPage(page)
+  }
+
   function goToPage(next: number): void {
     const clamped = Math.min(totalPages, Math.max(1, next))
     if (clamped === page && items.length) return
     void loadPage(clamped)
+  }
+
+  if (product) {
+    return (
+      <ProductDetailScreen
+        key={`${product.platform}:${product.product_id}`}
+        product={product}
+        backLabel="Order Details"
+        heading={
+          <>
+            <IconBag size={20} />
+            <span>Orders</span>
+          </>
+        }
+        onBack={() => setProduct(null)}
+        onStatus={setStatus}
+      />
+    )
+  }
+
+  if (selected) {
+    return (
+      <OrderDetailView
+        order={selected}
+        onBack={goBack}
+        onOpenProduct={(item) => void openProduct(item)}
+        busy={detailBusy}
+      />
+    )
   }
 
   return (
@@ -145,7 +233,13 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
               const thumbCount = Math.min(3, Math.max(order.items_count, order.item_covers.length))
               const hiddenItems = order.items_count - thumbCount
               return (
-                <article key={order.id} className="catalog-card order-card">
+                <button
+                  key={order.id}
+                  type="button"
+                  className="catalog-card order-card"
+                  disabled={detailBusy}
+                  onClick={() => void openOrder(order)}
+                >
                   <div className="order-card-number" title={order.order_id}>
                     Order # {order.order_id}
                   </div>
@@ -175,7 +269,7 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
                       )
                     })}
                   </div>
-                </article>
+                </button>
               )
             })}
           </div>

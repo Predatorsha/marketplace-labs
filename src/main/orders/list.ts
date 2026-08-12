@@ -4,6 +4,7 @@ import { connect } from '../core/connect'
 import { fromRelativeFolder } from '../core/paths'
 import { toMediaUrl } from '../media/protocol'
 import { resolveCoverPath } from '../products/gallery'
+import { formatOrderTotal } from './format'
 import type { OrderListItem, OrderListQuery, OrderListResult } from '../../shared/types'
 
 const DEFAULT_PAGE_SIZE = 6
@@ -11,41 +12,12 @@ const MAX_PAGE_SIZE = 48
 /** Сколько обложек товаров показываем в карточке заказа. */
 const MAX_COVERS = 3
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  EUR: '€',
-  USD: '$',
-  GBP: '£'
-}
-
 type OrderLineRow = {
   quantity: number | null
   unit_price: number | null
   currency: string | null
   product_id: number | null
   folder_path: string | null
-}
-
-/**
- * Сумма позиций для карточки. Валюты в заказе смешаны или ни у одной позиции
- * нет цены — суммы нет (честнее, чем сложить разные валюты числом).
- */
-function formatOrderTotal(lines: OrderLineRow[]): string | null {
-  const sums = new Map<string, number>()
-  for (const ln of lines) {
-    if (ln.unit_price == null || !Number.isFinite(Number(ln.unit_price))) continue
-    // Подарки (unit_price=0, валюты нет) сумме ничего не дают —
-    // не даём их пустой валюте сломать определение единой валюты заказа.
-    if (Number(ln.unit_price) === 0) continue
-    const qty = ln.quantity != null && Number(ln.quantity) > 0 ? Number(ln.quantity) : 1
-    const currency = (ln.currency || '').trim().toUpperCase()
-    sums.set(currency, (sums.get(currency) || 0) + Number(ln.unit_price) * qty)
-  }
-  if (sums.size !== 1) return null
-  const [currency, amount] = [...sums.entries()][0]
-  const text = amount.toFixed(2)
-  if (!currency) return text
-  const symbol = CURRENCY_SYMBOLS[currency]
-  return symbol ? `${symbol}${text}` : `${text} ${currency}`
 }
 
 export async function listOrders(

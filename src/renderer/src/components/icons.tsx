@@ -121,6 +121,17 @@ export function IconSearch({ className, size = 16 }: IconProps): React.JSX.Eleme
   )
 }
 
+export function IconPencil({ className, size = 16 }: IconProps): React.JSX.Element {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M11.3 1.3a1 1 0 011.4 0l2 2a1 1 0 010 1.4l-1.6 1.6-3.4-3.4 1.6-1.6zM8.3 4.3l3.4 3.4-6.4 6.4-3.9.5.5-3.9 6.4-6.4z"
+      />
+    </svg>
+  )
+}
+
 export function IconChevronLeft({ className, size = 14 }: IconProps): React.JSX.Element {
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
