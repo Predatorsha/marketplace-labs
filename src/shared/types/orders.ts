@@ -72,8 +72,6 @@ export type OrderDetailItem = {
   is_gift: boolean
   /** Обложка товара как `ml-media://…`, null — товара нет или нет фото. */
   cover_url: string | null
-  /** Ключ каталожной карточки — для перехода в деталку товара (позже). */
-  product_id: number | null
 }
 
 /** Посылка заказа на странице деталей. */

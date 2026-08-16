@@ -1,7 +1,20 @@
 import type { Page } from 'playwright'
 import type { MarketplacePlatform } from './url'
 import { scrapeAliExpressProductPage } from './aliexpress/product'
-import { scrapeTemuProductPage, type TemuOrderHint } from './temu/product'
+import { scrapeTemuProductPage } from './temu/product'
+
+/**
+ * Данные позиции заказа — фолбэк для карточек, умерших на маркетплейсе.
+ * Платформо-нейтральный: поля общие для всех маркетплейсов, платформенные
+ * скрейперы (temu/product.ts) потребляют его, а не наоборот.
+ */
+export type OrderItemHint = {
+  price?: string | number | null
+  title?: string | null
+  /** Миниатюра позиции; для карточки берём CDN-оригинал (без resize-параметров). */
+  image?: string | null
+  variant?: string | null
+}
 
 /**
  * Raw product payload produced by Playwright scrapers.
@@ -73,7 +86,7 @@ export async function scrapeProductPage(
     url: string
     productId: string
     /** Данные позиции заказа — фолбэк для sold-out / удалённых карточек. */
-    orderHint?: TemuOrderHint
+    orderHint?: OrderItemHint
   }
 ): Promise<ScrapedProduct> {
   if (opts.platform === 'temu') {

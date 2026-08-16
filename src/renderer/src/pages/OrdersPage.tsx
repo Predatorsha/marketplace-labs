@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { OrderDetail, OrderListItem } from '../../../shared/types'
+import type { OrderDetail, OrderListItem, OrderListResult } from '../../../shared/types'
+import ListSearchStub from '../components/ListSearchStub'
 import OrderDetailView from '../components/OrderDetailView'
+import PaginationBar from '../components/PaginationBar'
 import PixelMascot from '../components/PixelMascot'
-import {
-  IconBag,
-  IconChevronLeft,
-  IconChevronRight,
-  IconRefresh,
-  IconSearch
-} from '../components/icons'
-import { pageItems, platformLabel } from '../lib/listUi'
+import { IconBag, IconRefresh } from '../components/icons'
+import { platformLabel } from '../lib/listUi'
+import { usePagedList } from '../lib/usePagedList'
 
 const PAGE_SIZE = 6
 
@@ -18,10 +15,6 @@ type Props = {
 }
 
 export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
-  const [page, setPage] = useState(1)
-  const [items, setItems] = useState<OrderListItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [selected, setSelected] = useState<OrderDetail | null>(null)
   const [detailBusy, setDetailBusy] = useState(false)
@@ -30,44 +23,26 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
   const onStatusRef = useRef(onStatus)
   onStatusRef.current = onStatus
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-
   const setStatus = useCallback((message: string, kind: 'ok' | 'error' = 'ok'): void => {
     setNote(message)
     setNoteKind(kind)
     onStatusRef.current?.(message, kind)
   }, [])
 
-  const loadPage = useCallback(
-    async (nextPage: number): Promise<void> => {
-      if (!window.api?.listOrders) {
-        setStatus('Error: app API is not loaded.', 'error')
-        return
-      }
-      setLoading(true)
-      try {
-        const res = await window.api.listOrders({ page: nextPage, page_size: PAGE_SIZE })
-        if (!res.ok) {
-          setStatus(res.error || 'Could not load orders.', 'error')
-          setItems([])
-          setTotal(0)
-          return
-        }
-        setItems(res.items || [])
-        setTotal(res.total || 0)
-        setPage(res.page || nextPage)
-      } catch (exc) {
-        setStatus(exc instanceof Error ? exc.message : String(exc), 'error')
-      } finally {
-        setLoading(false)
-      }
+  const fetchPage = useCallback(
+    (nextPage: number, pageSize: number): Promise<OrderListResult> => {
+      if (!window.api?.listOrders) throw new Error('Error: app API is not loaded.')
+      return window.api.listOrders({ page: nextPage, page_size: pageSize })
     },
-    [setStatus]
+    []
   )
-
-  useEffect(() => {
-    void loadPage(1)
-  }, [loadPage])
+  const { page, items, total, totalPages, loading, loadPage, goToPage } =
+    usePagedList<OrderListItem>({
+      pageSize: PAGE_SIZE,
+      fetchPage,
+      fallbackError: 'Could not load orders.',
+      onError: (message) => setStatus(message, 'error')
+    })
 
   // Прогресс синка идёт событиями orders:progress — показываем его прямо на странице.
   useEffect(() => {
@@ -123,12 +98,6 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
     void loadPage(page)
   }
 
-  function goToPage(next: number): void {
-    const clamped = Math.min(totalPages, Math.max(1, next))
-    if (clamped === page && items.length) return
-    void loadPage(clamped)
-  }
-
   if (selected) {
     return <OrderDetailView order={selected} onBack={goBack} />
   }
@@ -152,16 +121,7 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
           </button>
         </div>
 
-        <div className="catalog-search-row" aria-hidden="true">
-          <label className="url-field catalog-search-field">
-            <IconSearch className="url-field-icon" size={16} />
-            <input type="search" placeholder="Search orders..." disabled tabIndex={-1} />
-          </label>
-          <button type="button" className="btn-download" disabled tabIndex={-1}>
-            <IconSearch size={15} />
-            <span>Search</span>
-          </button>
-        </div>
+        <ListSearchStub placeholder="Search orders..." />
 
         {note ? <div className={`orders-note${noteKind === 'error' ? ' error' : ''}`}>{note}</div> : null}
       </header>
@@ -221,43 +181,7 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
       </div>
 
       <footer className="catalog-footer">
-        <div className="catalog-pagination">
-          <button
-            type="button"
-            className="catalog-page-btn"
-            disabled={loading || page <= 1}
-            onClick={() => goToPage(page - 1)}
-            aria-label="Previous page"
-          >
-            <IconChevronLeft size={14} />
-          </button>
-          {pageItems(page, totalPages).map((entry, idx) =>
-            entry === 'ellipsis' ? (
-              <span key={`e-${idx}`} className="catalog-page-ellipsis">
-                …
-              </span>
-            ) : (
-              <button
-                key={entry}
-                type="button"
-                className={`catalog-page-btn${entry === page ? ' active' : ''}`}
-                disabled={loading}
-                onClick={() => goToPage(entry)}
-              >
-                {entry}
-              </button>
-            )
-          )}
-          <button
-            type="button"
-            className="catalog-page-btn"
-            disabled={loading || page >= totalPages}
-            onClick={() => goToPage(page + 1)}
-            aria-label="Next page"
-          >
-            <IconChevronRight size={14} />
-          </button>
-        </div>
+        <PaginationBar page={page} totalPages={totalPages} loading={loading} onPage={goToPage} />
 
         <div className="catalog-total">
           <span>Total: {total} orders</span>

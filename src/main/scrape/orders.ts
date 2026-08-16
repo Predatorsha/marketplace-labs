@@ -11,11 +11,12 @@ import {
   updateOrderStatuses,
   type OrderPayload
 } from '../code/orders'
+import { sendOrdersProgress } from '../ipc/progress'
 import { jobLog } from '../jobs/log'
 import type { OrderSyncOrder, OrderSyncPlan } from '../../shared/types'
 import { downloadProductWithPage } from './index'
+import type { OrderItemHint } from './product'
 import { temuOrderListService } from './temu/orders'
-import type { TemuOrderHint } from './temu/product'
 import { parseProductUrl, type MarketplacePlatform } from './url'
 
 /** Заказ, увиденный сервисом в списке заказов маркетплейса. */
@@ -96,6 +97,7 @@ export async function syncOrders(
     try {
       const page = await browserManager.ensureStarted(cfg.browser)
 
+      sendOrdersProgress('Scanning the order list…')
       const discovery = await service.discover(page, {
         shouldStop: (oldest) =>
           known.has(oldest.marketplace_order_id) &&
@@ -134,6 +136,11 @@ export async function syncOrders(
           marketplace_order_id: o.marketplace_order_id,
           status: normStatus(o.status)
         }))
+      )
+
+      sendOrdersProgress(
+        `Order list scanned: ${orders.length} seen, ${toDownload.length} new, ` +
+          `${statusUpdated.length} status updates.`
       )
 
       // У известных нефинальных заказов со сменившимся статусом дотягиваем
@@ -184,7 +191,13 @@ export async function syncOrders(
         )
       }
 
+      let queuePos = 0
       for (const order of downloadQueue) {
+        queuePos += 1
+        sendOrdersProgress(
+          `Downloading order ${queuePos} of ${downloadQueue.length}` +
+            ` (#${order.marketplace_order_id})…`
+        )
         try {
           const payload = await service.fetchOrder(page, order, { productUrlByTitle })
           if (!payload) {
@@ -204,7 +217,7 @@ export async function syncOrders(
             handledProducts.add(parsed.productId)
             if (productHasFolder(cfg, platform, parsed.productId)) continue
 
-            const hint: TemuOrderHint = {
+            const hint: OrderItemHint = {
               price: item.price ?? item.unit_price ?? null,
               title: item.title ?? null,
               image: item.image ?? null,

@@ -1,6 +1,11 @@
 import { access, readdir } from 'fs/promises'
 import { join } from 'path'
+import type { AppConfig } from '../config'
+import { getProductImages } from '../code/products'
+import type { CatalogDb } from '../core/connect'
+import { fromRelativeFolder } from '../core/paths'
 import type { ProductChoiceRow, ProductImageRow } from '../db/models/product'
+import { toMediaUrl } from '../media/protocol'
 import { resolveActiveSnapshot } from './snapshots'
 
 async function pathExists(p: string): Promise<boolean> {
@@ -46,6 +51,19 @@ async function scanImagesDir(folderAbs: string): Promise<string[]> {
   }
 }
 
+/** First existing DB image path; probes stop at the first hit (cover needs one). */
+async function resolveFirstRelPath(folderAbs: string, relPaths: string[]): Promise<string | null> {
+  for (const raw of relPaths) {
+    const rel = String(raw || '')
+      .trim()
+      .replace(/\\/g, '/')
+    if (!rel) continue
+    const abs = join(folderAbs, rel)
+    if (await pathExists(abs)) return abs
+  }
+  return null
+}
+
 /** First gallery photo from active snapshot: product_images[0], else images/01.* / first file. */
 export async function resolveCoverPath(
   productRootAbs: string,
@@ -54,11 +72,11 @@ export async function resolveCoverPath(
   const folderAbs = mediaRoot(productRootAbs)
   if (!folderAbs) return null
 
-  const fromDb = await resolveRelPaths(
+  const fromDb = await resolveFirstRelPath(
     folderAbs,
     images.map((img) => img.rel_path)
   )
-  if (fromDb.length) return fromDb[0]
+  if (fromDb) return fromDb
 
   try {
     const imagesDir = join(folderAbs, 'images')
@@ -71,6 +89,23 @@ export async function resolveCoverPath(
   } catch {
     return null
   }
+}
+
+/**
+ * Обложка товара как `ml-media://…` — общий пайплайн для списков и деталки
+ * заказа: relative folder → product_images → active snapshot → media URL.
+ */
+export async function resolveCoverUrl(
+  cfg: AppConfig,
+  db: CatalogDb,
+  productId: number,
+  folderPath: string | null
+): Promise<string | null> {
+  const folderAbs = fromRelativeFolder(cfg, folderPath)
+  if (!folderAbs) return null
+  const images = getProductImages(db, productId)
+  const coverPath = await resolveCoverPath(folderAbs, images)
+  return coverPath ? toMediaUrl(coverPath) : null
 }
 
 export type ResolvedChoice = {

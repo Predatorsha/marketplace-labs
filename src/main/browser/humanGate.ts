@@ -1,13 +1,7 @@
 import { BrowserWindow, Notification } from 'electron'
-
-export type HumanGateKind = 'login' | 'captcha'
-export type PlatformId = 'temu' | 'aliexpress'
-
-export type HumanGatePayload = {
-  kind: HumanGateKind
-  platform: PlatformId
-  message: string
-}
+// Типы гейта живут в shared/types/humanGate.ts: payload события orders:humanGate
+// должен быть типизирован одной копией по обе стороны IPC.
+import type { HumanGateKind, HumanGatePayload } from '../../shared/types/humanGate'
 
 export type HumanGateHandle = {
   gateId: number
@@ -135,8 +129,4 @@ export function resolveHumanGate(action: 'continue' | 'cancel', gateId: number):
   if (!active || active.id !== gateId) return false
   active.resolve(action)
   return true
-}
-
-export function isHumanGateOpen(): boolean {
-  return active !== null
 }

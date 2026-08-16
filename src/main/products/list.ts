@@ -1,18 +1,13 @@
 import type { AppConfig } from '../config'
-import {
-  getProductChoicePrices,
-  getProductImages,
-  joinChoicePrices
-} from '../code/products'
+import { getProductChoicePrices, joinChoicePrices } from '../code/products'
 import { connect } from '../core/connect'
 import { fromRelativeFolder } from '../core/paths'
-import { toMediaUrl } from '../media/protocol'
 import type {
   CatalogListItem,
   ProductListQuery,
   ProductListResult
 } from '../../shared/types'
-import { resolveCoverPath } from './gallery'
+import { resolveCoverUrl } from './gallery'
 
 const DEFAULT_PAGE_SIZE = 8
 const MAX_PAGE_SIZE = 48
@@ -53,44 +48,41 @@ export async function listProducts(
         folder_path: string | null
       }>
 
-      const items: CatalogListItem[] = []
-      for (const row of rows) {
-        const folderAbs = fromRelativeFolder(cfg, row.folder_path)
-        const price = joinChoicePrices(getProductChoicePrices(db, row.id))
-        const rating =
-          typeof row.rating === 'string' && row.rating.trim() ? row.rating.trim() : null
-        const review_count =
-          typeof row.review_count === 'string' && row.review_count.trim()
-            ? row.review_count.trim()
-            : null
-        const purpose =
-          typeof row.purpose === 'string' && row.purpose.trim() ? row.purpose.trim() : null
-        const pack_quantity =
-          row.pack_quantity != null && Number.isFinite(Number(row.pack_quantity))
-            ? Math.trunc(Number(row.pack_quantity))
-            : null
+      // Строки независимы: fs-пробы обложек идут параллельно, а не суммой.
+      const items: CatalogListItem[] = await Promise.all(
+        rows.map(async (row) => {
+          const folderAbs = fromRelativeFolder(cfg, row.folder_path)
+          const price = joinChoicePrices(getProductChoicePrices(db, row.id))
+          const rating =
+            typeof row.rating === 'string' && row.rating.trim() ? row.rating.trim() : null
+          const review_count =
+            typeof row.review_count === 'string' && row.review_count.trim()
+              ? row.review_count.trim()
+              : null
+          const purpose =
+            typeof row.purpose === 'string' && row.purpose.trim() ? row.purpose.trim() : null
+          const pack_quantity =
+            row.pack_quantity != null && Number.isFinite(Number(row.pack_quantity))
+              ? Math.trunc(Number(row.pack_quantity))
+              : null
 
-        let cover_url: string | null = null
-        if (folderAbs) {
-          const images = getProductImages(db, row.id)
-          const coverPath = await resolveCoverPath(folderAbs, images)
-          if (coverPath) cover_url = toMediaUrl(coverPath)
-        }
+          const cover_url = await resolveCoverUrl(cfg, db, row.id, row.folder_path)
 
-        items.push({
-          id: row.id,
-          platform: row.platform,
-          product_id: row.marketplace_product_id,
-          title: row.title,
-          purpose,
-          pack_quantity,
-          price,
-          rating,
-          review_count,
-          cover_url,
-          folder: folderAbs || ''
+          return {
+            id: row.id,
+            platform: row.platform,
+            product_id: row.marketplace_product_id,
+            title: row.title,
+            purpose,
+            pack_quantity,
+            price,
+            rating,
+            review_count,
+            cover_url,
+            folder: folderAbs || ''
+          }
         })
-      }
+      )
 
       return { ok: true, items, total, page, page_size: pageSize }
     } finally {

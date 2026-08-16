@@ -1,9 +1,6 @@
 import type { AppConfig } from '../config'
-import { getProductImages } from '../code/products'
 import { connect } from '../core/connect'
-import { fromRelativeFolder } from '../core/paths'
-import { toMediaUrl } from '../media/protocol'
-import { resolveCoverPath } from '../products/gallery'
+import { resolveCoverUrl } from '../products/gallery'
 import { formatOrderTotal } from './format'
 import type { OrderListItem, OrderListQuery, OrderListResult } from '../../shared/types'
 
@@ -60,34 +57,33 @@ export async function listOrders(
          ORDER BY oi.id ASC`
       )
 
-      const items: OrderListItem[] = []
-      for (const row of rows) {
-        const lines = linesStmt.all(row.id) as OrderLineRow[]
+      // Строки независимы: fs-работа по обложкам идёт параллельно, а не суммой.
+      const items: OrderListItem[] = await Promise.all(
+        rows.map(async (row) => {
+          const lines = linesStmt.all(row.id) as OrderLineRow[]
 
-        const item_covers: string[] = []
-        const seenProducts = new Set<number>()
-        for (const ln of lines) {
-          if (item_covers.length >= MAX_COVERS) break
-          if (ln.product_id == null || seenProducts.has(ln.product_id)) continue
-          seenProducts.add(ln.product_id)
-          const folderAbs = fromRelativeFolder(cfg, ln.folder_path)
-          if (!folderAbs) continue
-          const images = getProductImages(db, ln.product_id)
-          const coverPath = await resolveCoverPath(folderAbs, images)
-          if (coverPath) item_covers.push(toMediaUrl(coverPath))
-        }
+          const item_covers: string[] = []
+          const seenProducts = new Set<number>()
+          for (const ln of lines) {
+            if (item_covers.length >= MAX_COVERS) break
+            if (ln.product_id == null || seenProducts.has(ln.product_id)) continue
+            seenProducts.add(ln.product_id)
+            const cover = await resolveCoverUrl(cfg, db, ln.product_id, ln.folder_path)
+            if (cover) item_covers.push(cover)
+          }
 
-        items.push({
-          id: row.id,
-          platform: row.platform,
-          order_id: row.marketplace_order_id,
-          status: typeof row.status === 'string' && row.status.trim() ? row.status.trim() : null,
-          ordered_at: row.ordered_at || null,
-          total: formatOrderTotal(lines),
-          items_count: lines.length,
-          item_covers
+          return {
+            id: row.id,
+            platform: row.platform,
+            order_id: row.marketplace_order_id,
+            status: typeof row.status === 'string' && row.status.trim() ? row.status.trim() : null,
+            ordered_at: row.ordered_at || null,
+            total: formatOrderTotal(lines),
+            items_count: lines.length,
+            item_covers
+          }
         })
-      }
+      )
 
       return { ok: true, items, total, page, page_size: pageSize }
     } finally {

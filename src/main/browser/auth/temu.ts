@@ -64,7 +64,6 @@ export async function ensureTemuLoggedIn(page: Page, opts?: AuthGateOpts): Promi
 
     const captcha = await temuLooksLikeCaptcha(page).catch(() => false)
     if (captcha) {
-      opts?.progress?.({ phase: 'human_gate', kind: 'captcha', platform: 'temu' })
       const action = await waitForHumanGate({
         kind: 'captcha',
         platform: 'temu',
@@ -79,7 +78,6 @@ export async function ensureTemuLoggedIn(page: Page, opts?: AuthGateOpts): Promi
     const login = await temuNeedsLogin(page).catch(() => false)
     if (!login) return
 
-    opts?.progress?.({ phase: 'human_gate', kind: 'login', platform: 'temu' })
     const action = await waitForHumanGate({
       kind: 'login',
       platform: 'temu',

@@ -1,9 +1,6 @@
 import type { AppConfig } from '../config'
-import { getProductImages } from '../code/products'
 import { connect } from '../core/connect'
-import { fromRelativeFolder } from '../core/paths'
-import { toMediaUrl } from '../media/protocol'
-import { resolveCoverPath } from '../products/gallery'
+import { resolveCoverUrl } from '../products/gallery'
 import { formatLinePrice, formatOrderTotal } from './format'
 import type { OrderDetail, OrderDetailItem, OrderDetailPackage, OrderGetResult } from '../../shared/types'
 
@@ -62,12 +59,7 @@ export async function getOrder(cfg: AppConfig, id: number): Promise<OrderGetResu
           if (coverByProduct.has(ln.product_id)) {
             cover_url = coverByProduct.get(ln.product_id) ?? null
           } else {
-            const folderAbs = fromRelativeFolder(cfg, ln.folder_path)
-            if (folderAbs) {
-              const images = getProductImages(db, ln.product_id)
-              const coverPath = await resolveCoverPath(folderAbs, images)
-              if (coverPath) cover_url = toMediaUrl(coverPath)
-            }
+            cover_url = await resolveCoverUrl(cfg, db, ln.product_id, ln.folder_path)
             coverByProduct.set(ln.product_id, cover_url)
           }
         }
@@ -79,8 +71,7 @@ export async function getOrder(cfg: AppConfig, id: number): Promise<OrderGetResu
           quantity: ln.quantity != null && Number(ln.quantity) > 0 ? Number(ln.quantity) : 1,
           price: isGift ? null : formatLinePrice(ln),
           is_gift: isGift,
-          cover_url,
-          product_id: ln.product_id
+          cover_url
         })
       }
 

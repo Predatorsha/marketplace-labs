@@ -27,23 +27,6 @@ export function extractPackQuantityFromTitle(title: string): number | null {
   return null
 }
 
-/** Pack size from SKU/option labels: "6 colors set", "12pcs". */
-export function extractPackQuantityFromVariants(variants: unknown): number | null {
-  if (!Array.isArray(variants)) return null
-  for (const group of variants) {
-    if (!group || typeof group !== 'object') continue
-    const options = (group as { options?: unknown }).options
-    if (!Array.isArray(options)) continue
-    for (const opt of options) {
-      if (!opt || typeof opt !== 'object') continue
-      const name = String((opt as { name?: unknown }).name || '')
-      const n = extractPackQuantityFromTitle(name)
-      if (n != null) return n
-    }
-  }
-  return null
-}
-
 function normalizePurposeLabel(raw: string): string | null {
   let s = raw
     .trim()

@@ -28,7 +28,7 @@ const api = {
     ipcRenderer.invoke('orders:humanGateContinue', { gateId }),
 
   cancelHumanGate: (gateId: number): Promise<boolean> =>
-    ipcRenderer.invoke('orders:cancel', { gateId }),
+    ipcRenderer.invoke('orders:humanGateCancel', { gateId }),
 
   onHumanGate: (cb: (payload: HumanGateEvent) => void): (() => void) => {
     const listener = (_: Electron.IpcRendererEvent, payload: HumanGateEvent): void => cb(payload)

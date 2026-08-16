@@ -6,7 +6,7 @@ import { ensureTemuLoggedIn } from '../../browser/auth/temu'
 import { jobLog } from '../../jobs/log'
 import { gotoOnline } from '../net'
 import { normalizeDisplayPrice } from '../price'
-import type { ScrapedChoiceDraft, ScrapedProduct } from '../product'
+import type { OrderItemHint, ScrapedChoiceDraft, ScrapedProduct } from '../product'
 import {
   isTemuProductSoldOut,
   isTemuProductUnavailable,
@@ -55,15 +55,6 @@ async function closeTemuSkuModal(page: Page): Promise<void> {
  * Navigates, waits for login gate if needed, extracts fields from the first screen.
  * Unavailable listings return `status: 'archived'` without gallery/price (caller updates DB only).
  */
-/** Данные позиции заказа — фолбэк для карточек, умерших на маркетплейсе. */
-export type TemuOrderHint = {
-  price?: string | number | null
-  title?: string | null
-  /** Миниатюра позиции; для карточки берём CDN-оригинал (без resize-параметров). */
-  image?: string | null
-  variant?: string | null
-}
-
 /**
  * Дамп HTML страницы в userData/debug — разбор состояний Temu, которые не
  * воспроизвести руками (sold out и пустые снапшоты показываются не всегда).
@@ -98,7 +89,7 @@ function fullSizeTemuImage(src: string | null | undefined): string | null {
  */
 async function scrapeTemuSnapshotPage(
   page: Page,
-  opts: { url: string; productId: string; orderHint?: TemuOrderHint }
+  opts: { url: string; productId: string; orderHint?: OrderItemHint }
 ): Promise<ScrapedProduct> {
   const snapshotUrl = `https://www.temu.com/goods_snapshot.html?goods_id=${opts.productId}&title=Details`
   await gotoOnline(page, snapshotUrl)
@@ -221,7 +212,7 @@ async function scrapeTemuSnapshotPage(
  */
 function buildTemuProductFromOrderHint(
   opts: { url: string; productId: string },
-  hint: TemuOrderHint
+  hint: OrderItemHint
 ): ScrapedProduct | null {
   const image = fullSizeTemuImage(hint.image)
   const title = (hint.title || '').trim() || null
@@ -241,7 +232,7 @@ function buildTemuProductFromOrderHint(
 
 export async function scrapeTemuProductPage(
   page: Page,
-  opts: { url: string; productId: string; orderHint?: TemuOrderHint }
+  opts: { url: string; productId: string; orderHint?: OrderItemHint }
 ): Promise<ScrapedProduct> {
   await gotoOnline(page, opts.url)
   await sleep(1500)

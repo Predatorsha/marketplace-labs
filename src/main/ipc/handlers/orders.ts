@@ -32,7 +32,8 @@ export function registerOrdersHandlers(): void {
 
   /**
    * Синк списка заказов: мотает список, обновляет статусы известных заказов,
-   * возвращает план — какие заказы ещё не скачаны (само скачивание — TODO).
+   * скачивает новые заказы (с товарами) в пределах капа за прогон и
+   * возвращает план с итогами.
    */
   ipcMain.handle('orders:start', async (_evt, args: { platform?: string }): Promise<
     OrderStartResult
@@ -81,7 +82,9 @@ export function registerOrdersHandlers(): void {
     return resolveHumanGate('continue', Number(args?.gateId))
   })
 
-  ipcMain.handle('orders:cancel', async (_evt, args: { gateId: number }) => {
+  // Имя симметрично orders:humanGateContinue: канал отменяет только human gate,
+  // а не синк — «orders:cancel» читался как отмена синка.
+  ipcMain.handle('orders:humanGateCancel', async (_evt, args: { gateId: number }) => {
     return resolveHumanGate('cancel', Number(args?.gateId))
   })
 }
