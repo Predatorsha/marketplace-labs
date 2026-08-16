@@ -91,16 +91,6 @@ Priorities: **P1** user/data breakers, **P2** wrong data or unfinished wiring, *
 
 ---
 
-### P2-7 — Order sync unfinished; `orders:progress` never emitted
-
-**Where:** `src/main/ipc/handlers/orders.ts` (~6–13) stub; `src/main/scrape/orders.ts` throws; upsert helpers in `code/orders.ts` unused. Preload/App listen for `orders:progress`; main never `webContents.send('orders:progress', …)`. Product scrape calls `ensureTemuLoggedIn(page)` without progress wiring.
-
-**What:** Orders UI cannot sync; progress channel is dead.
-
-**Fix direction:** Wire scrape → `applyOrderSyncPayload`; emit progress from jobs/auth; remove stub when ready. Until then, keep UI honest about stub.
-
----
-
 ### P2-8 — Market auth guard is a no-op
 
 **Where:** `src/main/browser/marketAuth.ts` (~36–38); installed from `src/main/browser/manager.ts` (~219–223). Comment implies AliExpress navigations should open login gate. Only explicit `ensureTemuLoggedIn` (product scrape) gates today.
@@ -237,5 +227,5 @@ Priorities: **P1** user/data breakers, **P2** wrong data or unfinished wiring, *
 
 - Prefer minimal diffs; match existing style.
 - Path bugs (P1-1, P1-2, P1-3, P2-13) are one cluster — fix together if touching `paths.ts` / folder helpers.
-- Orders items (P1-4, P2-6, P2-7, P2-12, P3-2) can wait until order sync is real, except P1-4 if you want the parser safe early.
+- Orders items (P1-4, P2-6, P2-12, P3-2) can wait until order sync is real, except P1-4 if you want the parser safe early.
 - After each fix: remove the section here. If skipped on purpose: move it to `docs/bugs-wont-fix.md`.

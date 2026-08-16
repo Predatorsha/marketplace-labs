@@ -11,7 +11,6 @@ import {
   updateOrderStatuses,
   type OrderPayload
 } from '../code/orders'
-import { sendOrdersProgress } from '../ipc/progress'
 import { jobLog } from '../jobs/log'
 import type { OrderSyncOrder, OrderSyncPlan } from '../../shared/types'
 import { downloadProductWithPage } from './index'
@@ -77,13 +76,18 @@ function normStatus(status: string | null | undefined): string {
 /**
  * Синк списка заказов платформы:
  * 1) сервис платформы мотает список до дна или до известного финального заказа;
- * 2) заказы, которых нет в БД → план на скачивание (само скачивание — следующий шаг);
- * 3) известные нефинальные с новым статусом → обновляем только статус;
+ * 2) заказы, которых нет в БД → очередь на скачивание; очередь качается тут же
+ *    (деталка заказа + скрейп новых товаров), в пределах капа за прогон;
+ * 3) известные нефинальные с новым статусом → обновляем статус и посылки;
  * 4) известные с терминальным статусом (Delivered/Refunded) → не трогаем.
+ *
+ * `opts.onProgress` — человекочитаемые статусы для UI; scrape не знает про
+ * IPC/окно, отправку событий подключает вызыватель (ipc/handlers/orders.ts).
  */
 export async function syncOrders(
   cfg: AppConfig,
-  platform: MarketplacePlatform
+  platform: MarketplacePlatform,
+  opts?: { onProgress?: (message: string) => void }
 ): Promise<OrderSyncPlan> {
   const service = ORDER_LIST_SERVICES[platform]
   if (!service) {
@@ -97,7 +101,7 @@ export async function syncOrders(
     try {
       const page = await browserManager.ensureStarted(cfg.browser)
 
-      sendOrdersProgress('Scanning the order list…')
+      opts?.onProgress?.('Scanning the order list…')
       const discovery = await service.discover(page, {
         shouldStop: (oldest) =>
           known.has(oldest.marketplace_order_id) &&
@@ -138,7 +142,7 @@ export async function syncOrders(
         }))
       )
 
-      sendOrdersProgress(
+      opts?.onProgress?.(
         `Order list scanned: ${orders.length} seen, ${toDownload.length} new, ` +
           `${statusUpdated.length} status updates.`
       )
@@ -194,7 +198,7 @@ export async function syncOrders(
       let queuePos = 0
       for (const order of downloadQueue) {
         queuePos += 1
-        sendOrdersProgress(
+        opts?.onProgress?.(
           `Downloading order ${queuePos} of ${downloadQueue.length}` +
             ` (#${order.marketplace_order_id})…`
         )

@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { loadConfig } from '../../config'
 import { resolveHumanGate } from '../../browser/humanGate'
+import { sendOrdersProgress } from '../progress'
 import { jobLog } from '../../jobs/log'
 import { getOrder } from '../../orders/get'
 import { listOrders } from '../../orders/list'
@@ -50,7 +51,7 @@ export function registerOrdersHandlers(): void {
 
     const cfg = loadConfig()
     try {
-      const plan = await syncOrders(cfg, 'temu')
+      const plan = await syncOrders(cfg, 'temu', { onProgress: sendOrdersProgress })
       return {
         ok: plan.orders_failed === 0,
         platform: 'temu',

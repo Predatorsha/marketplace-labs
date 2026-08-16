@@ -38,14 +38,19 @@ export function usePagedList<T>(opts: {
   const [loading, setLoading] = useState(false)
   const onErrorRef = useRef(opts.onError)
   onErrorRef.current = opts.onError
+  // Защита от гонки: два быстрых loadPage (клик страницы + Back из деталки) —
+  // устаревший ответ не должен затирать более поздний.
+  const genRef = useRef(0)
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   const loadPage = useCallback(
     async (nextPage: number): Promise<void> => {
+      const gen = ++genRef.current
       setLoading(true)
       try {
         const res = await fetchPage(nextPage, pageSize)
+        if (gen !== genRef.current) return
         if (!res.ok) {
           onErrorRef.current(res.error || fallbackError)
           setItems([])
@@ -56,9 +61,10 @@ export function usePagedList<T>(opts: {
         setTotal(res.total || 0)
         setPage(res.page || nextPage)
       } catch (exc) {
+        if (gen !== genRef.current) return
         onErrorRef.current(exc instanceof Error ? exc.message : String(exc))
       } finally {
-        setLoading(false)
+        if (gen === genRef.current) setLoading(false)
       }
     },
     [fetchPage, pageSize, fallbackError]
