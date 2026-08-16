@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type {
-  OrderDetail,
-  OrderDetailItem,
-  OrderListItem,
-  ProductCard
-} from '../../../shared/types'
+import type { OrderDetail, OrderListItem } from '../../../shared/types'
 import OrderDetailView from '../components/OrderDetailView'
 import PixelMascot from '../components/PixelMascot'
-import ProductDetailScreen from '../components/ProductDetailScreen'
 import {
   IconBag,
   IconChevronLeft,
@@ -30,7 +24,6 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
   const [loading, setLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [selected, setSelected] = useState<OrderDetail | null>(null)
-  const [product, setProduct] = useState<ProductCard | null>(null)
   const [detailBusy, setDetailBusy] = useState(false)
   const [note, setNote] = useState('')
   const [noteKind, setNoteKind] = useState<'ok' | 'error'>('ok')
@@ -125,30 +118,6 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
     }
   }
 
-  async function openProduct(item: OrderDetailItem): Promise<void> {
-    if (!selected || !item.product_id) return
-    if (!window.api?.getProduct) {
-      setStatus('Error: app API is not loaded.', 'error')
-      return
-    }
-    setDetailBusy(true)
-    try {
-      const res = await window.api.getProduct({
-        platform: selected.platform,
-        product_id: item.product_id
-      })
-      if (!res.ok || !res.product) {
-        setStatus(res.error || 'Could not open product.', 'error')
-        return
-      }
-      setProduct(res.product)
-    } catch (exc) {
-      setStatus(exc instanceof Error ? exc.message : String(exc), 'error')
-    } finally {
-      setDetailBusy(false)
-    }
-  }
-
   function goBack(): void {
     setSelected(null)
     void loadPage(page)
@@ -160,33 +129,8 @@ export default function OrdersPage({ onStatus }: Props): React.JSX.Element {
     void loadPage(clamped)
   }
 
-  if (product) {
-    return (
-      <ProductDetailScreen
-        key={`${product.platform}:${product.product_id}`}
-        product={product}
-        backLabel="Order Details"
-        heading={
-          <>
-            <IconBag size={20} />
-            <span>Orders</span>
-          </>
-        }
-        onBack={() => setProduct(null)}
-        onStatus={setStatus}
-      />
-    )
-  }
-
   if (selected) {
-    return (
-      <OrderDetailView
-        order={selected}
-        onBack={goBack}
-        onOpenProduct={(item) => void openProduct(item)}
-        busy={detailBusy}
-      />
-    )
+    return <OrderDetailView order={selected} onBack={goBack} />
   }
 
   return (

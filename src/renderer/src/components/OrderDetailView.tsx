@@ -1,22 +1,14 @@
-import type { OrderDetail, OrderDetailItem } from '../../../shared/types'
+import type { OrderDetail } from '../../../shared/types'
 import { IconBag, IconChevronLeft, IconChevronRight, IconDoc, IconPackage, IconPencil } from './icons'
 import { platformLabel, statusTone } from '../lib/listUi'
 
 type Props = {
   order: OrderDetail
   onBack: () => void
-  /** Клик по позиции с товаром из каталога — открыть карточку товара. */
-  onOpenProduct?: (item: OrderDetailItem) => void
-  busy?: boolean
 }
 
 /** Страница Order Details: сводка заказа, посылки и позиции. */
-export default function OrderDetailView({
-  order,
-  onBack,
-  onOpenProduct,
-  busy
-}: Props): React.JSX.Element {
+export default function OrderDetailView({ order, onBack }: Props): React.JSX.Element {
   return (
     <div className="catalog-page order-detail">
       <header className="catalog-header">
@@ -94,46 +86,28 @@ export default function OrderDetailView({
             <span>Items ({order.items.length})</span>
           </h2>
           <div className="order-detail-items">
-            {order.items.map((item) => {
-              const clickable = Boolean(item.product_id && onOpenProduct)
-              const content = (
-                <>
-                  <span className="order-item-thumb">
-                    {item.cover_url ? (
-                      <img src={item.cover_url} alt="" />
-                    ) : (
-                      <span className="order-card-thumb-noimg">No photo</span>
-                    )}
+            {order.items.map((item) => (
+              <div key={item.id} className="order-item-row">
+                <span className="order-item-thumb">
+                  {item.cover_url ? (
+                    <img src={item.cover_url} alt="" />
+                  ) : (
+                    <span className="order-card-thumb-noimg">No photo</span>
+                  )}
+                </span>
+                <span className="order-item-info">
+                  <span className="order-item-title" title={item.title || undefined}>
+                    {item.title || '—'}
                   </span>
-                  <span className="order-item-info">
-                    <span className="order-item-title" title={item.title || undefined}>
-                      {item.title || '—'}
-                    </span>
-                    <span className="order-item-bottom">
-                      <span className="order-item-qty">Qty {item.quantity}</span>
-                      <span className={`order-item-price${item.is_gift ? ' gift' : ''}`}>
-                        {item.is_gift ? 'Free' : item.price || '—'}
-                      </span>
+                  <span className="order-item-bottom">
+                    <span className="order-item-qty">Qty {item.quantity}</span>
+                    <span className={`order-item-price${item.is_gift ? ' gift' : ''}`}>
+                      {item.is_gift ? 'Free' : item.price || '—'}
                     </span>
                   </span>
-                </>
-              )
-              return clickable ? (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="order-item-row order-item-link"
-                  disabled={busy}
-                  onClick={() => onOpenProduct?.(item)}
-                >
-                  {content}
-                </button>
-              ) : (
-                <div key={item.id} className="order-item-row">
-                  {content}
-                </div>
-              )
-            })}
+                </span>
+              </div>
+            ))}
           </div>
         </section>
       </div>

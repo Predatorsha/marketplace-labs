@@ -15,7 +15,6 @@ type ItemRow = {
   currency: string | null
   is_gift: number
   product_id: number | null
-  marketplace_product_id: string | null
   product_title: string | null
   folder_path: string | null
 }
@@ -46,8 +45,7 @@ export async function getOrder(cfg: AppConfig, id: number): Promise<OrderGetResu
         .prepare(
           `SELECT oi.id AS id, oi.title AS title, oi.quantity AS quantity,
                   oi.unit_price AS unit_price, oi.currency AS currency, oi.is_gift AS is_gift,
-                  p.id AS product_id, p.marketplace_product_id AS marketplace_product_id,
-                  p.title AS product_title, p.folder_path AS folder_path
+                  p.id AS product_id, p.title AS product_title, p.folder_path AS folder_path
            FROM order_items oi
            LEFT JOIN products p ON p.id = oi.product_id
            WHERE oi.order_id = ?
@@ -82,7 +80,7 @@ export async function getOrder(cfg: AppConfig, id: number): Promise<OrderGetResu
           price: isGift ? null : formatLinePrice(ln),
           is_gift: isGift,
           cover_url,
-          product_id: ln.marketplace_product_id
+          product_id: ln.product_id
         })
       }
 
