@@ -9,7 +9,13 @@ import { getProductTags } from '../code/tags'
 import { connect, type CatalogDb } from '../core/connect'
 import { fromRelativeFolder, toRelativeFolder } from '../core/paths'
 import { toMediaUrl } from '../media/protocol'
-import type { ProductCard, ProductGetResult, ProductKey } from '../../shared/types'
+import type {
+  ProductCard,
+  ProductDataSource,
+  ProductGetResult,
+  ProductImportSource,
+  ProductKey
+} from '../../shared/types'
 import { resolveChoiceItems, resolveGalleryPaths } from './gallery'
 import { countArchivedSnapshots } from './snapshots'
 
@@ -27,10 +33,13 @@ export type ProductRow = {
   review_count: string | null
   description: string | null
   status: string
+  import_source: string | null
+  data_source: string | null
 }
 
 const PRODUCT_SELECT = `SELECT id, platform, marketplace_product_id, title, url, folder_path,
-                  purpose, pack_quantity, my_rating, rating, review_count, description, status
+                  purpose, pack_quantity, my_rating, rating, review_count, description, status,
+                  import_source, data_source
            FROM products`
 
 function normalizeKey(key: ProductKey): ProductKey {
@@ -92,6 +101,14 @@ function asStringOrNull(value: unknown): string | null {
   return trimmed ? trimmed : null
 }
 
+function asImportSource(value: unknown): ProductImportSource | null {
+  return value === 'link' || value === 'orders' ? value : null
+}
+
+function asDataSource(value: unknown): ProductDataSource | null {
+  return value === 'live' || value === 'snapshot' || value === 'order_data' ? value : null
+}
+
 function asMyRating(value: unknown): number | null {
   if (value == null || value === '') return null
   const n = Number(value)
@@ -130,6 +147,8 @@ export function buildProductCard(
     review_count: asStringOrNull(row.review_count),
     price: joinChoicePrices(choices.map((c) => c.price)),
     status: row.status || 'active',
+    import_source: asImportSource(row.import_source),
+    data_source: asDataSource(row.data_source),
     description: typeof row.description === 'string' ? row.description : null,
     tags,
     image_urls: imageUrls,

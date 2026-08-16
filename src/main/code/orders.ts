@@ -136,6 +136,29 @@ export function productHasFolder(
 }
 
 /**
+ * Последняя позиция заказа с этим товаром — источник хинта для перекачки
+ * (тайтл/вариант/цена мёртвого листинга). Подарочные позиции пропускаем:
+ * их unit_price принудительно 0 и товару не принадлежит.
+ */
+export function latestOrderItemForProduct(
+  db: CatalogDb,
+  productId: number
+): { title: string | null; sku: string | null; unit_price: number | null; currency: string | null } | null {
+  const row = db
+    .prepare(
+      `SELECT oi.title, oi.sku, oi.unit_price, oi.currency
+         FROM order_items oi JOIN orders o ON o.id = oi.order_id
+        WHERE oi.product_id = ? AND oi.is_gift = 0
+        ORDER BY o.ordered_at DESC, oi.id DESC
+        LIMIT 1`
+    )
+    .get(productId) as
+    | { title: string | null; sku: string | null; unit_price: number | null; currency: string | null }
+    | undefined
+  return row ?? null
+}
+
+/**
  * Нормализация названия товара для матчинга позиций заказа с карточками БД.
  * Слишком короткие названия (< 10 знаков) не матчим — велик шанс совпадения
  * разных товаров.
@@ -288,11 +311,14 @@ function upsertOrderItem(
 
   let productId: number | null = null
   if (mpid) {
+    // data_source не передаём: у уже скачанных карточек COALESCE сохранит
+    // прежнее значение, у голых строк сработает INSERT-дефолт 'order_data'.
     productId = upsertProductRecord(db, cfg, {
       platform: orderPlat,
       marketplace_product_id: mpid,
       title: opts.title,
-      url: opts.product_url
+      url: opts.product_url,
+      import_source: 'orders'
     })
     // Карточке товара нулевую «подарочную» цену не подсказываем.
     const priceHint = isGift

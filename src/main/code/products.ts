@@ -3,6 +3,7 @@ import { connect, utcNowIso, type CatalogDb } from '../core/connect'
 import { toRelativeFolder } from '../core/paths'
 import type { ProductChoiceRow, ProductImageRow, ProductSpecRow } from '../db/models/product'
 import { jobLog } from '../jobs/log'
+import type { ProductDataSource, ProductImportSource } from '../../shared/types'
 import {
   extractPackQuantityFromTitle,
   inferPurposeFromProduct,
@@ -218,6 +219,10 @@ export function upsertProductRecord(
     video?: string | null
     overwrite_purpose?: boolean
     status?: string | null
+    /** Триггер, создавший карточку. Пишется только при INSERT, апдейтом не меняется. */
+    import_source?: ProductImportSource | null
+    /** Источник данных карточки; null/undefined в апдейте сохраняет прежнее значение. */
+    data_source?: ProductDataSource | null
   }
 ): number {
   const platform = (opts.platform || '').trim().toLowerCase()
@@ -272,6 +277,7 @@ export function upsertProductRecord(
            store_url = COALESCE(?, store_url),
            video = COALESCE(?, video),
            status = COALESCE(?, status),
+           data_source = COALESCE(?, data_source),
            last_seen_at = ?,
            updated_at = ?
        WHERE id = ?`
@@ -290,6 +296,7 @@ export function upsertProductRecord(
       normalizeTextField(opts.store_url),
       normalizeTextField(opts.video),
       nextStatus,
+      opts.data_source ?? null,
       now,
       now,
       row.id
@@ -304,8 +311,8 @@ export function upsertProductRecord(
         platform, marketplace_product_id, title, url, folder_path, purpose, pack_quantity,
         rating, review_count, description, orders,
         seller_name, seller_id, store_url, video,
-        status, last_seen_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        status, import_source, data_source, last_seen_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       platform,
@@ -324,6 +331,10 @@ export function upsertProductRecord(
       normalizeTextField(opts.store_url),
       normalizeTextField(opts.video),
       insertStatus,
+      opts.import_source ?? null,
+      // Единственный вставщик без явного data_source — голые строки из позиций
+      // заказа (upsertOrderItem): их карточка и правда собрана из данных заказа.
+      opts.data_source ?? 'order_data',
       now,
       now,
       now
@@ -488,6 +499,7 @@ export async function upsertProductFromSaved(
     platform: string
     product: Record<string, unknown>
     folder: string
+    import_source: ProductImportSource
     purpose?: string | null
     tags?: string[] | null
     choices?: ProductChoiceRow[] | null
@@ -580,7 +592,14 @@ export async function upsertProductFromSaved(
           ? 'archived'
           : opts.product.status === 'active'
             ? 'active'
-            : null
+            : null,
+      import_source: opts.import_source,
+      data_source:
+        opts.product.data_source === 'live' ||
+        opts.product.data_source === 'snapshot' ||
+        opts.product.data_source === 'order_data'
+          ? opts.product.data_source
+          : null
     })
     setProductChoices(db, id, choices)
     // Replace children only when the scrape produced rows. Empty arrays mean

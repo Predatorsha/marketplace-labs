@@ -117,6 +117,25 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
     }
   }
 
+  async function onReimport(): Promise<{ ok: boolean; error?: string }> {
+    if (!selected || !window.api?.reimportProduct) {
+      return { ok: false, error: 'Cannot re-import: product is not loaded.' }
+    }
+    const key = { platform: selected.platform, product_id: selected.product_id }
+    setDetailBusy(true)
+    try {
+      const res = await window.api.reimportProduct(key)
+      if (!res.ok) return { ok: false, error: res.error || 'Re-import failed.' }
+      const fresh = await window.api.getProduct(key)
+      if (fresh.ok && fresh.product) setSelected(fresh.product)
+      return { ok: true }
+    } catch (exc) {
+      return { ok: false, error: exc instanceof Error ? exc.message : String(exc) }
+    } finally {
+      setDetailBusy(false)
+    }
+  }
+
   function goBack(): void {
     setSelected(null)
     void loadPage(page)
@@ -139,6 +158,7 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
           busy={detailBusy}
           onOpenFolder={() => void onOpenFolder()}
           onSaveDetails={onSaveDetails}
+          onReimport={onReimport}
         />
       </div>
     )

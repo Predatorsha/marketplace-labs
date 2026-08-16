@@ -1,4 +1,5 @@
 import type { Page } from 'playwright'
+import type { ProductDataSource } from '../../shared/types'
 import type { MarketplacePlatform } from './url'
 import { scrapeAliExpressProductPage } from './aliexpress/product'
 import { scrapeTemuProductPage } from './temu/product'
@@ -57,6 +58,12 @@ export type ScrapedProduct = {
    * страницы, только фолбэк из данных заказа.
    */
   dead_listing?: boolean
+  /**
+   * Откуда собраны данные карточки (живая PDP / снапшот / данные заказа).
+   * Голые archived-возвраты без данных его не ставят — в БД тогда остаётся
+   * прежнее значение.
+   */
+  data_source?: ProductDataSource
   /** Remote gallery URLs (excludes choice image). Consumed by saveScrapedProductToDisk. */
   gallery_image_urls?: string[]
   /** Choice drafts before disk save, in buy-box radio order. */

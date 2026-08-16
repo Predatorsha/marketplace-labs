@@ -4,7 +4,7 @@ import { jobLog } from '../../jobs/log'
 import { getProduct } from '../../products/load'
 import { listProducts } from '../../products/list'
 import { updateProduct } from '../../products/update'
-import { scrapeProduct } from '../../scrape'
+import { reimportProduct, scrapeProduct } from '../../scrape'
 import type { ProductEditableFields, ProductKey, ProductListQuery } from '../../../shared/types'
 
 export function registerProductsHandlers(): void {
@@ -18,6 +18,19 @@ export function registerProductsHandlers(): void {
     } catch (exc) {
       const message = exc instanceof Error ? exc.message : String(exc)
       jobLog(`[ipc] products:download fail ${message}`)
+      return { ok: false, error: message }
+    }
+  })
+
+  /** Re-import button → полный каскад скрейпа по сохранённому URL карточки. */
+  ipcMain.handle('products:reimport', async (_evt, args: ProductKey) => {
+    const cfg = loadConfig()
+    jobLog(`[ipc] products:reimport ${JSON.stringify(args)}`)
+    try {
+      return await reimportProduct(cfg, args)
+    } catch (exc) {
+      const message = exc instanceof Error ? exc.message : String(exc)
+      jobLog(`[ipc] products:reimport fail ${message}`)
       return { ok: false, error: message }
     }
   })

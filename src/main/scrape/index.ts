@@ -1,10 +1,17 @@
 import type { Page } from 'playwright'
 import type { AppConfig } from '../config'
 import { browserManager } from '../browser/manager'
+import { latestOrderItemForProduct } from '../code/orders'
 import { applyProductMarketplaceStatus, upsertProductFromSaved } from '../code/products'
+import { connect } from '../core/connect'
 import { jobLog } from '../jobs/log'
 import { saveScrapedProductToDisk } from '../products/files'
-import type { ProductDownloadResult } from '../../shared/types'
+import { findProductRow } from '../products/load'
+import type {
+  ProductDownloadResult,
+  ProductImportSource,
+  ProductKey
+} from '../../shared/types'
 import { ALIEXPRESS_IMAGE_REFERER } from './aliexpress/product'
 import { scrapeProductPage, type OrderItemHint } from './product'
 import { TEMU_IMAGE_REFERER } from './temu/product'
@@ -26,7 +33,12 @@ const IMAGE_REFERER_BY_PLATFORM: Record<MarketplacePlatform, string> = {
  */
 export async function scrapeProduct(
   cfg: AppConfig,
-  url: string
+  url: string,
+  opts?: {
+    importSource?: ProductImportSource
+    /** Данные позиции заказа — фолбэк для sold-out / удалённых карточек. */
+    orderHint?: OrderItemHint
+  }
 ): Promise<ProductDownloadResult> {
   const trimmed = String(url || '').trim()
   if (!trimmed) {
@@ -39,7 +51,10 @@ export async function scrapeProduct(
     return await browserManager.withLock(async () => {
       try {
         const page = await browserManager.ensureStarted(cfg.browser)
-        return await downloadProductWithPage(cfg, page, parsed)
+        return await downloadProductWithPage(cfg, page, parsed, {
+          importSource: opts?.importSource ?? 'link',
+          orderHint: opts?.orderHint
+        })
       } finally {
         // Persist profile cookies, then shut Chromium so it does not linger after scrape.
         await browserManager.close()
@@ -61,7 +76,13 @@ export async function downloadProductWithPage(
   cfg: AppConfig,
   page: Page,
   parsed: ParsedProductUrl,
-  opts?: {
+  opts: {
+    /**
+     * Триггер импорта — задаётся вызывателем явно (по наличию orderHint его
+     * не отличить: перекачка тоже передаёт восстановленный хинт). В БД поле
+     * insert-only: у существующих карточек не меняется.
+     */
+    importSource: ProductImportSource
     /** Данные позиции заказа — фолбэк для sold-out / удалённых карточек. */
     orderHint?: OrderItemHint
   }
@@ -72,7 +93,7 @@ export async function downloadProductWithPage(
       platform: parsed.platform,
       url: parsed.url,
       productId: parsed.productId,
-      orderHint: opts?.orderHint
+      orderHint: opts.orderHint
     })
 
     // Unavailable PDP: flip catalog status only (no gallery/price to save).
@@ -131,7 +152,8 @@ export async function downloadProductWithPage(
         ...(saved.product as Record<string, unknown>),
         status: scraped.status ?? 'active'
       },
-      folder: saved.folder
+      folder: saved.folder,
+      import_source: opts.importSource
     })
 
     const choices = saved.product.local_files?.choices ?? []
@@ -166,4 +188,47 @@ export async function downloadProductWithPage(
     jobLog(`scrape fail platform=${parsed.platform} product_id=${parsed.productId} ${message}`)
     return { ok: false, error: message }
   }
+}
+
+/**
+ * Перекачка уже существующей карточки: тот же каскад скрейпа по сохранённому
+ * URL. Хинт для фолбэка мёртвых листингов восстанавливается из последней
+ * позиции заказа с этим товаром (картинка позиции в БД не хранится — при
+ * пустом скачивании прежние фото переносит вперёд saveScrapedProductToDisk).
+ */
+export async function reimportProduct(
+  cfg: AppConfig,
+  key: ProductKey
+): Promise<ProductDownloadResult> {
+  let url: string | null = null
+  let orderHint: OrderItemHint | undefined
+  const db = connect(cfg)
+  try {
+    const row = findProductRow(db, cfg, key)
+    if (!row) {
+      return { ok: false, error: 'Product not found' }
+    }
+    url = (row.url || '').trim() || null
+    if (!url) {
+      return { ok: false, error: 'Product has no stored URL to re-import from' }
+    }
+    const item = latestOrderItemForProduct(db, row.id)
+    if (item) {
+      orderHint = {
+        title: item.title,
+        variant: item.sku,
+        price:
+          item.unit_price != null
+            ? item.currency
+              ? `${item.currency} ${item.unit_price}`
+              : String(item.unit_price)
+            : null,
+        image: null
+      }
+    }
+  } finally {
+    db.close()
+  }
+
+  return scrapeProduct(cfg, url, { importSource: 'link', orderHint })
 }

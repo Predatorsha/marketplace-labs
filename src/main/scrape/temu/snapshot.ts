@@ -38,6 +38,7 @@ export function buildTemuProductFromOrderHint(
     description: title,
     status: 'archived',
     dead_listing: true,
+    data_source: 'order_data',
     gallery_image_urls: image ? [image] : [],
     choices: [{ image_url: null, name: hint.variant ?? null, group: null, price }]
   }
@@ -157,6 +158,7 @@ export async function scrapeTemuSnapshotPage(
     title,
     description: title,
     status: 'archived',
+    data_source: 'snapshot',
     rating: reviews.rating,
     review_count: reviews.reviewCount,
     seller_name: sellerName,

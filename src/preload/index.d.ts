@@ -26,6 +26,7 @@ export type DesktopApi = {
   ) => () => void
   onProgress: (cb: (data: Record<string, unknown>) => void) => () => void
   downloadProduct: (url: string) => Promise<ProductDownloadResult>
+  reimportProduct: (key: ProductKey) => Promise<ProductDownloadResult>
   listProducts: (query?: ProductListQuery) => Promise<ProductListResult>
   getProduct: (key: ProductKey) => Promise<ProductGetResult>
   updateProduct: (key: ProductKey, patch: ProductEditableFields) => Promise<ProductUpdateResult>
