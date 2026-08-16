@@ -17,6 +17,7 @@ When adding or moving files, read [ARCHITECTURE.md](ARCHITECTURE.md) and place c
 - `code` — SQLite read/write
 - `core` — connect, paths, migrate
 - `products` — list/get/update, gallery, on-disk folders
+- `orders` — order list/get/format for the Orders UI
 - `media` — `ml-media://`
 - `jobs` — job logs
 - Shared IPC types → `src/shared/types`
