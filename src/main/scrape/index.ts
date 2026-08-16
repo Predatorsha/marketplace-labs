@@ -6,10 +6,17 @@ import { jobLog } from '../jobs/log'
 import { saveScrapedProductToDisk } from '../products/files'
 import type { ProductDownloadResult } from '../../shared/types'
 import { ALIEXPRESS_IMAGE_REFERER } from './aliexpress/product'
-import { scrapeProductPage } from './product'
-import { TEMU_IMAGE_REFERER, type TemuOrderHint } from './temu/product'
+import { scrapeProductPage, type OrderItemHint } from './product'
+import { TEMU_IMAGE_REFERER } from './temu/product'
 import { resolveTemuSellerStore } from './temu/seller'
-import { parseProductUrl, type ParsedProductUrl } from './url'
+import { parseProductUrl, type MarketplacePlatform, type ParsedProductUrl } from './url'
+
+// Реферер для скачивания CDN-картинок; своим владеет каждый платформенный
+// модуль, карта не даёт новой платформе молча провалиться в чужой referer.
+const IMAGE_REFERER_BY_PLATFORM: Record<MarketplacePlatform, string> = {
+  temu: TEMU_IMAGE_REFERER,
+  aliexpress: ALIEXPRESS_IMAGE_REFERER
+}
 
 /**
  * Single product-scrape entry point.
@@ -56,13 +63,7 @@ export async function downloadProductWithPage(
   parsed: ParsedProductUrl,
   opts?: {
     /** Данные позиции заказа — фолбэк для sold-out / удалённых карточек. */
-    orderHint?: TemuOrderHint
-    /**
-     * Мёртвый листинг («discontinued») не сохранять: вернуть ok + dead_listing,
-     * чтобы вызывающий поставил товар в очередь ретраев. Без флага фолбэк-карточка
-     * сохраняется сразу (поведение одиночного скрейпа).
-     */
-    deferDeadListing?: boolean
+    orderHint?: OrderItemHint
   }
 ): Promise<ProductDownloadResult> {
   try {
@@ -73,21 +74,6 @@ export async function downloadProductWithPage(
       productId: parsed.productId,
       orderHint: opts?.orderHint
     })
-
-    if (scraped.dead_listing && opts?.deferDeadListing) {
-      jobLog(
-        `scrape dead listing deferred platform=${parsed.platform} product_id=${scraped.product_id}`
-      )
-      return {
-        ok: true,
-        platform: parsed.platform,
-        product_id: scraped.product_id,
-        title: scraped.title ?? null,
-        url: scraped.url ?? parsed.url,
-        status: 'archived',
-        dead_listing: true
-      }
-    }
 
     // Unavailable PDP: flip catalog status only (no gallery/price to save).
     if (scraped.status === 'archived' && !scraped.choices?.length) {
@@ -121,7 +107,7 @@ export async function downloadProductWithPage(
     const saved = await saveScrapedProductToDisk(cfg, {
       platform: parsed.platform,
       product: scraped,
-      imageReferer: parsed.platform === 'temu' ? TEMU_IMAGE_REFERER : ALIEXPRESS_IMAGE_REFERER
+      imageReferer: IMAGE_REFERER_BY_PLATFORM[parsed.platform]
     })
 
     // Temu: click store icon in the same tab, capture store_url + mall_id.

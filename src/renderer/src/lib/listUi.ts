@@ -7,6 +7,20 @@ export function platformLabel(platform: string): string {
   return platform || '—'
 }
 
+export type StatusTone = 'green' | 'blue' | 'orange' | 'grey'
+
+/**
+ * Цвет бейджа по тексту статуса маркетплейса ("Delivered on Jun 14, 2026",
+ * "In transit", …). Неизвестный статус — оранжевый, как «в работе».
+ */
+export function statusTone(status: string | null | undefined): StatusTone {
+  const s = (status || '').toLowerCase()
+  if (/(cancel|refund|return)/.test(s)) return 'grey'
+  if (/(delivered|shipped)/.test(s)) return 'green'
+  if (/(transit|on the way|out for delivery)/.test(s)) return 'blue'
+  return 'orange'
+}
+
 export function pageItems(current: number, totalPages: number): Array<number | 'ellipsis'> {
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, i) => i + 1)

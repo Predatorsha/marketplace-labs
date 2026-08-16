@@ -58,6 +58,48 @@ export type OrderListItem = {
   item_covers: string[]
 }
 
+/** Позиция заказа на странице деталей. */
+export type OrderDetailItem = {
+  id: number
+  /** Название товара: order_items.title, фолбэк — products.title. */
+  title: string | null
+  quantity: number
+  /**
+   * Цена позиции строкой (например "€18.40"), уже умноженная на количество.
+   * null — цена не распарсилась при синке.
+   */
+  price: string | null
+  is_gift: boolean
+  /** Обложка товара как `ml-media://…`, null — товара нет или нет фото. */
+  cover_url: string | null
+}
+
+/** Посылка заказа на странице деталей. */
+export type OrderDetailPackage = {
+  id: number
+  label: string | null
+  status: string | null
+  tracking_code: string | null
+}
+
+/** Полный заказ для страницы Order Details. */
+export type OrderDetail = {
+  id: number
+  platform: string
+  order_id: string
+  status: string | null
+  ordered_at: string | null
+  total: string | null
+  items: OrderDetailItem[]
+  packages: OrderDetailPackage[]
+}
+
+export type OrderGetResult = {
+  ok: boolean
+  order?: OrderDetail
+  error?: string
+}
+
 export type OrderListQuery = {
   page?: number
   page_size?: number

@@ -1,20 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type {
   CatalogListItem,
   ProductCard,
-  ProductEditableFields
+  ProductEditableFields,
+  ProductListResult
 } from '../../../shared/types'
+import ListSearchStub from '../components/ListSearchStub'
+import PaginationBar from '../components/PaginationBar'
 import ProductDetailPanels, { productCardToDetails } from '../components/ProductDetailPanels'
 import PixelMascot from '../components/PixelMascot'
 import StarRatingDisplay from '../components/StarRatingDisplay'
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconFolder,
-  IconHeart,
-  IconSearch
-} from '../components/icons'
-import { pageItems, platformLabel } from '../lib/listUi'
+import { IconFolder, IconHeart } from '../components/icons'
+import { platformLabel } from '../lib/listUi'
+import { usePagedList } from '../lib/usePagedList'
 
 const PAGE_SIZE = 6
 
@@ -44,44 +42,25 @@ function formatCardHeading(item: CatalogListItem): string {
 }
 
 export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
-  const [page, setPage] = useState(1)
-  const [items, setItems] = useState<CatalogListItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<ProductCard | null>(null)
   const [detailBusy, setDetailBusy] = useState(false)
   const onStatusRef = useRef(onStatus)
   onStatusRef.current = onStatus
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-
-  const loadPage = useCallback(async (nextPage: number): Promise<void> => {
-    if (!window.api?.listProducts) {
-      onStatusRef.current?.('Error: app API is not loaded.', 'error')
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await window.api.listProducts({ page: nextPage, page_size: PAGE_SIZE })
-      if (!res.ok) {
-        onStatusRef.current?.(res.error || 'Could not load catalog.', 'error')
-        setItems([])
-        setTotal(0)
-        return
-      }
-      setItems(res.items || [])
-      setTotal(res.total || 0)
-      setPage(res.page || nextPage)
-    } catch (exc) {
-      onStatusRef.current?.(exc instanceof Error ? exc.message : String(exc), 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadPage(1)
-  }, [loadPage])
+  const fetchPage = useCallback(
+    (nextPage: number, pageSize: number): Promise<ProductListResult> => {
+      if (!window.api?.listProducts) throw new Error('Error: app API is not loaded.')
+      return window.api.listProducts({ page: nextPage, page_size: pageSize })
+    },
+    []
+  )
+  const { page, items, total, totalPages, loading, loadPage, goToPage } =
+    usePagedList<CatalogListItem>({
+      pageSize: PAGE_SIZE,
+      fetchPage,
+      fallbackError: 'Could not load catalog.',
+      onError: (message) => onStatusRef.current?.(message, 'error')
+    })
 
   async function openProduct(item: CatalogListItem): Promise<void> {
     if (!window.api?.getProduct) return
@@ -143,12 +122,6 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
     void loadPage(page)
   }
 
-  function goToPage(next: number): void {
-    const clamped = Math.min(totalPages, Math.max(1, next))
-    if (clamped === page && items.length) return
-    void loadPage(clamped)
-  }
-
   if (selected) {
     return (
       <div className="catalog-page catalog-detail">
@@ -179,16 +152,7 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
           <span>Catalog</span>
         </h1>
 
-        <div className="catalog-search-row" aria-hidden="true">
-          <label className="url-field catalog-search-field">
-            <IconSearch className="url-field-icon" size={16} />
-            <input type="search" placeholder="Search products..." disabled tabIndex={-1} />
-          </label>
-          <button type="button" className="btn-download" disabled tabIndex={-1}>
-            <IconSearch size={15} />
-            <span>Search</span>
-          </button>
-        </div>
+        <ListSearchStub placeholder="Search products..." />
       </header>
 
       <div className="catalog-grid-wrap">
@@ -251,43 +215,7 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
       </div>
 
       <footer className="catalog-footer">
-        <div className="catalog-pagination">
-          <button
-            type="button"
-            className="catalog-page-btn"
-            disabled={loading || page <= 1}
-            onClick={() => goToPage(page - 1)}
-            aria-label="Previous page"
-          >
-            <IconChevronLeft size={14} />
-          </button>
-          {pageItems(page, totalPages).map((entry, idx) =>
-            entry === 'ellipsis' ? (
-              <span key={`e-${idx}`} className="catalog-page-ellipsis">
-                …
-              </span>
-            ) : (
-              <button
-                key={entry}
-                type="button"
-                className={`catalog-page-btn${entry === page ? ' active' : ''}`}
-                disabled={loading}
-                onClick={() => goToPage(entry)}
-              >
-                {entry}
-              </button>
-            )
-          )}
-          <button
-            type="button"
-            className="catalog-page-btn"
-            disabled={loading || page >= totalPages}
-            onClick={() => goToPage(page + 1)}
-            aria-label="Next page"
-          >
-            <IconChevronRight size={14} />
-          </button>
-        </div>
+        <PaginationBar page={page} totalPages={totalPages} loading={loading} onPage={goToPage} />
 
         <div className="catalog-total">
           <span>Total: {total} items</span>

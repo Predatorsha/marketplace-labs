@@ -2,13 +2,12 @@ import type { Page } from 'playwright'
 import { ensureTemuLoggedIn } from '../../browser/auth/temu'
 import { jobLog } from '../../jobs/log'
 import { normalizeDisplayPrice } from '../price'
-import type { ScrapedChoiceDraft, ScrapedProduct } from '../product'
+import type { OrderItemHint, ScrapedChoiceDraft, ScrapedProduct } from '../product'
 import { isTemuProductSoldOut, isTemuProductUnavailable } from './availability'
-import { extractTemuReviews, extractTemuTitle } from './buyBox'
-import { extractTemuDescriptionSpecs, extractTemuSpecs } from './details'
+import { dumpTemuDebugHtml } from './debug'
 import { extractTemuDom } from './extract'
-import { collectTemuGallery } from './gallery'
-import { extractTemuSellerName } from './seller'
+import { gotoTemuPage } from './nav'
+import { buildTemuProductFromOrderHint, scrapeTemuSnapshotPage } from './snapshot'
 import { sleep } from './util'
 
 /** Referer for downloading Temu CDN images outside the browser. */
@@ -47,141 +46,18 @@ async function closeTemuSkuModal(page: Page): Promise<void> {
  * Navigates, waits for login gate if needed, extracts fields from the first screen.
  * Unavailable listings return `status: 'archived'` without gallery/price (caller updates DB only).
  */
-/** Данные позиции заказа — фолбэк для карточек, умерших на маркетплейсе. */
-export type TemuOrderHint = {
-  price?: string | number | null
-  title?: string | null
-  /** Миниатюра позиции; для карточки берём CDN-оригинал (без resize-параметров). */
-  image?: string | null
-  variant?: string | null
-}
-
-/** CDN-URL без imageView2-параметров — максимальный доступный размер. */
-function fullSizeTemuImage(src: string | null | undefined): string | null {
-  const s = String(src || '').trim()
-  if (!s || s.startsWith('data:')) return null
-  return s.split('?')[0]
-}
-
-/**
- * Sold-out товар: качаем данные со страницы-снапшота goods_snapshot.html.
- * Там есть галерея (тот же #leftContent ol > li), тайтл, отзывы, имя продавца
- * и specs в блоке «Description», но нет буй-бокса: ни цены, ни вариантов —
- * единственный вариант получает цену из заказа (orderHint) или заглушку «—».
- */
-async function scrapeTemuSnapshotPage(
-  page: Page,
-  opts: { url: string; productId: string; orderHint?: TemuOrderHint }
-): Promise<ScrapedProduct> {
-  const snapshotUrl = `https://www.temu.com/goods_snapshot.html?goods_id=${opts.productId}&title=Details`
-  await page.goto(snapshotUrl, { waitUntil: 'domcontentloaded', timeout: 90_000 })
-  await sleep(1500)
-  await ensureTemuLoggedIn(page)
-
-  await page
-    .waitForFunction(
-      () => document.querySelectorAll('#leftContent ol > li').length > 2,
-      { timeout: 20_000 }
-    )
-    .catch(() => undefined)
-
-  // Слайды рейла дорисовываются пачками — ждём, пока их число перестанет расти,
-  // иначе снимем только первые 2 фотки.
-  let prevCount = 0
-  for (let i = 0; i < 20; i++) {
-    const count = await page.evaluate(
-      () => document.querySelectorAll('#leftContent ol > li').length
-    )
-    if (count === prevCount && count > 2) break
-    prevCount = count
-    await sleep(700)
-  }
-
-  const gallery = await collectTemuGallery(page)
-  // Радио-вариантов на снапшоте нет — все фото рейла товарные, ничего не отрезаем.
-  const images = [...gallery.images, ...gallery.choices]
-  if (!images.length) {
-    throw new Error('temu: no gallery images found on snapshot page')
-  }
-
-  let title = await extractTemuTitle(page)
-  if (!title) {
-    // Фолбэк: alt большой фотки галереи — на снапшоте это полный тайтл.
-    title = await page.evaluate(() => {
-      for (const img of document.querySelectorAll('#leftContent img')) {
-        const alt = (img.getAttribute('alt') || '').trim()
-        if (alt.length > 20) return alt
-      }
-      return null
-    })
-  }
-  if (!title) {
-    throw new Error('temu: product title not found on snapshot page')
-  }
-
-  const reviews = await extractTemuReviews(page)
-  const sellerName = await extractTemuSellerName(page)
-  const specs = {
-    ...(await extractTemuSpecs(page)),
-    ...(await extractTemuDescriptionSpecs(page))
-  }
-
-  const hint = opts.orderHint
-  const price = normalizeDisplayPrice(hint?.price == null ? null : String(hint.price)) || '—'
-
-  return {
-    product_id: opts.productId,
-    url: opts.url,
-    title,
-    description: title,
-    status: 'archived',
-    rating: reviews.rating,
-    review_count: reviews.reviewCount,
-    seller_name: sellerName,
-    seller_id: null,
-    store_url: null,
-    specs: Object.keys(specs).length > 0 ? specs : undefined,
-    gallery_image_urls: images,
-    choices: [{ image_url: null, name: hint?.variant ?? null, group: null, price }]
-  }
-}
-
-/**
- * Листинг удалён совсем (нет даже снапшота): собираем минимальную archived-карточку
- * из данных позиции заказа — фото миниатюры (CDN-оригинал), тайтл, вариант, цена.
- */
-function buildTemuProductFromOrderHint(
-  opts: { url: string; productId: string },
-  hint: TemuOrderHint
-): ScrapedProduct | null {
-  const image = fullSizeTemuImage(hint.image)
-  const title = (hint.title || '').trim() || null
-  if (!image && !title) return null
-  const price = normalizeDisplayPrice(hint.price == null ? null : String(hint.price)) || '—'
-  return {
-    product_id: opts.productId,
-    url: opts.url,
-    title,
-    description: title,
-    status: 'archived',
-    dead_listing: true,
-    gallery_image_urls: image ? [image] : [],
-    choices: [{ image_url: null, name: hint.variant ?? null, group: null, price }]
-  }
-}
-
 export async function scrapeTemuProductPage(
   page: Page,
-  opts: { url: string; productId: string; orderHint?: TemuOrderHint }
+  opts: { url: string; productId: string; orderHint?: OrderItemHint }
 ): Promise<ScrapedProduct> {
-  await page.goto(opts.url, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+  await gotoTemuPage(page, opts.url)
   await sleep(1500)
 
   await ensureTemuLoggedIn(page)
 
   const cur = page.url()
   if (!/goods|product|\d{6,}/i.test(cur) || cur.includes('about:blank')) {
-    await page.goto(opts.url, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+    await gotoTemuPage(page, opts.url)
     await sleep(1000)
   }
 
@@ -225,6 +101,7 @@ export async function scrapeTemuProductPage(
   // Sold out: буй-бокса и галереи на goods.html нет — уходим на снапшот.
   if (await isTemuProductSoldOut(page)) {
     jobLog(`temu product ${opts.productId}: sold out, scraping snapshot page`)
+    await dumpTemuDebugHtml(page, opts.productId, 'goods-sold-out')
     return scrapeTemuSnapshotPage(page, opts)
   }
 

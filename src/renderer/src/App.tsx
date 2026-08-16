@@ -66,16 +66,21 @@ export default function App(): React.JSX.Element {
     try {
       const result = await window.api.downloadProduct(url)
       setLastDownload(result)
-      if (result.ok && result.folder) {
+      if (result.ok) {
         setProductUrl('')
         setStatusKind('ok')
+        // Мёртвый листинг, уже известный каталогу, архивируется без папки —
+        // это успех, а не ошибка скачивания.
         setStatus(
-          `Downloaded${result.title ? `: ${result.title}` : ''}` +
-            (result.platform ? ` (${result.platform})` : '')
+          result.folder
+            ? `Downloaded${result.title ? `: ${result.title}` : ''}` +
+                (result.platform ? ` (${result.platform})` : '')
+            : `Listing is unavailable — product archived in catalog` +
+                (result.title ? `: ${result.title}` : '')
         )
       } else {
         setStatusKind('error')
-        setStatus(result.error || 'Product download is not available yet.')
+        setStatus(result.error || 'Download failed.')
       }
     } catch (exc) {
       setLastDownload({ ok: false, error: exc instanceof Error ? exc.message : String(exc) })
@@ -135,9 +140,11 @@ export default function App(): React.JSX.Element {
         url: p.url,
         purpose: p.purpose,
         pack_quantity: p.pack_quantity,
+        my_rating: p.my_rating,
         price: p.price,
         tags: p.tags || [],
-        status: p.status
+        status: p.status,
+        dead_listing: lastDownload.dead_listing
       })
       setStatusKind('ok')
       setStatus('Saved.')

@@ -1,10 +1,8 @@
 import type { Page } from 'playwright'
-import type { PlatformId } from './humanGate'
+import type { PlatformId } from '../../shared/types/humanGate'
 import { ensureAliExpressLoggedIn } from './auth/aliexpress'
 import { ensureTemuLoggedIn } from './auth/temu'
-import type { AuthGateOpts, AuthProgressFn } from './auth/util'
-
-export type ProgressFn = AuthProgressFn
+import type { AuthGateOpts } from './auth/util'
 
 function platformFromUrl(pageUrl: string): PlatformId | null {
   const host = pageUrl.toLowerCase()

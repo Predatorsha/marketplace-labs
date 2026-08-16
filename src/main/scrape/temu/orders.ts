@@ -3,6 +3,7 @@ import { ensureTemuLoggedIn } from '../../browser/auth/temu'
 import { normalizeProductTitle } from '../../code/orders'
 import type { OrderPayload } from '../../db/models/order'
 import { jobLog } from '../../jobs/log'
+import { gotoTemuPage } from './nav'
 import type { DiscoveredOrder, OrderListDiscovery, OrderListService } from '../orders'
 import { parseProductUrl } from '../url'
 import {
@@ -252,7 +253,7 @@ async function clickOrderCardInList(page: Page, orderId: string): Promise<boolea
  * забираем её URL и открываем в основной вкладке.
  */
 async function openTemuOrderDetailViaList(page: Page, orderId: string): Promise<boolean> {
-  await page.goto(TEMU_ORDERS_URL, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+  await gotoTemuPage(page, TEMU_ORDERS_URL)
   await sleep(1500)
   await ensureTemuLoggedIn(page)
   await page.waitForSelector('#TabListWrapperDOMId', { timeout: 45_000 }).catch(() => undefined)
@@ -270,7 +271,7 @@ async function openTemuOrderDetailViaList(page: Page, orderId: string): Promise<
       if (extra) {
         const url = extra.url()
         await extra.close().catch(() => undefined)
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+        await gotoTemuPage(page, url)
         return waitForTemuOrderDetail(page, orderId, 20_000)
       }
       return false
@@ -286,7 +287,7 @@ async function openTemuOrderDetailViaList(page: Page, orderId: string): Promise<
 
 /** Открывает деталку заказа: прямой URL, при неудаче — клик из списка. */
 async function openTemuOrderDetail(page: Page, orderId: string): Promise<boolean> {
-  await page.goto(temuOrderDetailUrl(orderId), { waitUntil: 'domcontentloaded', timeout: 90_000 })
+  await gotoTemuPage(page, temuOrderDetailUrl(orderId))
   await sleep(1200)
   await ensureTemuLoggedIn(page)
 
@@ -402,14 +403,14 @@ export const temuOrderListService: OrderListService = {
   platform: 'temu',
 
   async discover(page, opts): Promise<OrderListDiscovery> {
-    await page.goto(TEMU_ORDERS_URL, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+    await gotoTemuPage(page, TEMU_ORDERS_URL)
     await sleep(1500)
 
     await ensureTemuLoggedIn(page)
 
     // После логина Temu может увести со списка заказов — возвращаемся.
     if (!page.url().includes('bgt_orders')) {
-      await page.goto(TEMU_ORDERS_URL, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+      await gotoTemuPage(page, TEMU_ORDERS_URL)
       await sleep(1000)
     }
 

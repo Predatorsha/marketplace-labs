@@ -47,7 +47,6 @@ export async function ensureAliExpressLoggedIn(page: Page, opts?: AuthGateOpts):
 
     const captcha = await aliexpressLooksLikeCaptcha(page).catch(() => false)
     if (captcha) {
-      opts?.progress?.({ phase: 'human_gate', kind: 'captcha', platform: 'aliexpress' })
       const action = await waitForHumanGate({
         kind: 'captcha',
         platform: 'aliexpress',
@@ -62,7 +61,6 @@ export async function ensureAliExpressLoggedIn(page: Page, opts?: AuthGateOpts):
     const login = await aliexpressNeedsLogin(page).catch(() => false)
     if (!login) return
 
-    opts?.progress?.({ phase: 'human_gate', kind: 'login', platform: 'aliexpress' })
     const action = await waitForHumanGate({
       kind: 'login',
       platform: 'aliexpress',

@@ -27,6 +27,7 @@ Electron three-process layout:
 | `src/main/code` | SQLite read/write helpers | Playwright / disk I/O |
 | `src/main/core` | Connect, paths, migrate | Domain features |
 | `src/main/products` | List/get/update, gallery, on-disk product folders | Marketplace DOM scrape |
+| `src/main/orders` | Order list/get/format for the Orders UI | Marketplace DOM scrape |
 | `src/main/media` | `ml-media://` protocol | Product business rules |
 | `src/main/jobs` | Job / download logging | Feature logic |
 

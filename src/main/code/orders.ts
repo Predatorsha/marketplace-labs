@@ -43,22 +43,6 @@ export function parseMoney(value: unknown): { unitPrice: number | null; currency
   return { unitPrice: Number.isFinite(parsed) ? parsed : null, currency }
 }
 
-export function hasOrder(cfg: AppConfig, platform: string, marketplaceOrderId: string): boolean {
-  const db = connect(cfg)
-  try {
-    const row = db
-      .prepare(
-        `SELECT id FROM orders WHERE platform = ? AND marketplace_order_id = ?`
-      )
-      .get(platform.trim().toLowerCase(), String(marketplaceOrderId).trim()) as
-      | { id: number }
-      | undefined
-    return Boolean(row)
-  } finally {
-    db.close()
-  }
-}
-
 /**
  * Терминальный статус заказа: дальше он на маркетплейсе не меняется,
  * такие заказы при синке не перечитываем и статус не обновляем.
@@ -124,18 +108,6 @@ export function updateOrderStatuses(
       throw exc
     }
     return n
-  } finally {
-    db.close()
-  }
-}
-
-export function listKnownOrderIds(cfg: AppConfig, platform: string): Set<string> {
-  const db = connect(cfg)
-  try {
-    const rows = db
-      .prepare(`SELECT marketplace_order_id FROM orders WHERE platform = ?`)
-      .all(platform.trim().toLowerCase()) as Array<{ marketplace_order_id: string }>
-    return new Set(rows.map((r) => String(r.marketplace_order_id)))
   } finally {
     db.close()
   }

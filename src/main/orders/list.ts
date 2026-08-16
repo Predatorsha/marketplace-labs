@@ -1,9 +1,7 @@
 import type { AppConfig } from '../config'
-import { getProductImages } from '../code/products'
 import { connect } from '../core/connect'
-import { fromRelativeFolder } from '../core/paths'
-import { toMediaUrl } from '../media/protocol'
-import { resolveCoverPath } from '../products/gallery'
+import { resolveCoverUrl } from '../products/gallery'
+import { formatOrderTotal } from './format'
 import type { OrderListItem, OrderListQuery, OrderListResult } from '../../shared/types'
 
 const DEFAULT_PAGE_SIZE = 6
@@ -11,41 +9,12 @@ const MAX_PAGE_SIZE = 48
 /** Сколько обложек товаров показываем в карточке заказа. */
 const MAX_COVERS = 3
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  EUR: '€',
-  USD: '$',
-  GBP: '£'
-}
-
 type OrderLineRow = {
   quantity: number | null
   unit_price: number | null
   currency: string | null
   product_id: number | null
   folder_path: string | null
-}
-
-/**
- * Сумма позиций для карточки. Валюты в заказе смешаны или ни у одной позиции
- * нет цены — суммы нет (честнее, чем сложить разные валюты числом).
- */
-function formatOrderTotal(lines: OrderLineRow[]): string | null {
-  const sums = new Map<string, number>()
-  for (const ln of lines) {
-    if (ln.unit_price == null || !Number.isFinite(Number(ln.unit_price))) continue
-    // Подарки (unit_price=0, валюты нет) сумме ничего не дают —
-    // не даём их пустой валюте сломать определение единой валюты заказа.
-    if (Number(ln.unit_price) === 0) continue
-    const qty = ln.quantity != null && Number(ln.quantity) > 0 ? Number(ln.quantity) : 1
-    const currency = (ln.currency || '').trim().toUpperCase()
-    sums.set(currency, (sums.get(currency) || 0) + Number(ln.unit_price) * qty)
-  }
-  if (sums.size !== 1) return null
-  const [currency, amount] = [...sums.entries()][0]
-  const text = amount.toFixed(2)
-  if (!currency) return text
-  const symbol = CURRENCY_SYMBOLS[currency]
-  return symbol ? `${symbol}${text}` : `${text} ${currency}`
 }
 
 export async function listOrders(
@@ -88,34 +57,33 @@ export async function listOrders(
          ORDER BY oi.id ASC`
       )
 
-      const items: OrderListItem[] = []
-      for (const row of rows) {
-        const lines = linesStmt.all(row.id) as OrderLineRow[]
+      // Строки независимы: fs-работа по обложкам идёт параллельно, а не суммой.
+      const items: OrderListItem[] = await Promise.all(
+        rows.map(async (row) => {
+          const lines = linesStmt.all(row.id) as OrderLineRow[]
 
-        const item_covers: string[] = []
-        const seenProducts = new Set<number>()
-        for (const ln of lines) {
-          if (item_covers.length >= MAX_COVERS) break
-          if (ln.product_id == null || seenProducts.has(ln.product_id)) continue
-          seenProducts.add(ln.product_id)
-          const folderAbs = fromRelativeFolder(cfg, ln.folder_path)
-          if (!folderAbs) continue
-          const images = getProductImages(db, ln.product_id)
-          const coverPath = await resolveCoverPath(folderAbs, images)
-          if (coverPath) item_covers.push(toMediaUrl(coverPath))
-        }
+          const item_covers: string[] = []
+          const seenProducts = new Set<number>()
+          for (const ln of lines) {
+            if (item_covers.length >= MAX_COVERS) break
+            if (ln.product_id == null || seenProducts.has(ln.product_id)) continue
+            seenProducts.add(ln.product_id)
+            const cover = await resolveCoverUrl(cfg, db, ln.product_id, ln.folder_path)
+            if (cover) item_covers.push(cover)
+          }
 
-        items.push({
-          id: row.id,
-          platform: row.platform,
-          order_id: row.marketplace_order_id,
-          status: typeof row.status === 'string' && row.status.trim() ? row.status.trim() : null,
-          ordered_at: row.ordered_at || null,
-          total: formatOrderTotal(lines),
-          items_count: lines.length,
-          item_covers
+          return {
+            id: row.id,
+            platform: row.platform,
+            order_id: row.marketplace_order_id,
+            status: typeof row.status === 'string' && row.status.trim() ? row.status.trim() : null,
+            ordered_at: row.ordered_at || null,
+            total: formatOrderTotal(lines),
+            items_count: lines.length,
+            item_covers
+          }
         })
-      }
+      )
 
       return { ok: true, items, total, page, page_size: pageSize }
     } finally {

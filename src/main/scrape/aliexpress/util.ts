@@ -1,6 +1,4 @@
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
+export { sleep } from '../../core/sleep'
 
 /**
  * Full-size AliExpress media URL from a thumbnail:

@@ -791,10 +791,14 @@ select.info-input {
   padding: 2px 2px 8px;
 }
 
-/* Страница листается по 6 плашек — сетка 3×2. */
+/* Каталог, как и заказы: 6 плашек на страницу, всегда 3 колонки (3×2),
+   карточка не шире 380px. В узком окне колонки ужимаются, а не переносятся. */
 .catalog-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 380px));
+  justify-content: center;
+  max-width: calc(3 * 380px + 2 * 14px);
+  margin-inline: auto;
   gap: 14px;
 }
 
@@ -1055,11 +1059,13 @@ select.info-input {
   image-rendering: pixelated;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .catalog-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 380px));
   }
+}
 
+@media (max-width: 860px) {
   .catalog-total {
     position: static;
   }
@@ -1067,6 +1073,12 @@ select.info-input {
   .catalog-footer {
     flex-wrap: wrap;
     justify-content: space-between;
+  }
+}
+
+@media (max-width: 560px) {
+  .catalog-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1093,23 +1105,12 @@ select.info-input {
   color: #c0392b;
 }
 
-/* Плашки как на макете: почти квадратные, не шире 380px — колонок столько,
-   сколько влезает, карточка никогда не растягивается на полэкрана. */
-.orders-grid {
-  grid-template-columns: repeat(auto-fill, minmax(300px, 380px));
-  justify-content: center;
-}
+/* Сетка заказов — общая .catalog-grid (3×2, карточки до 380px). */
 
-/* Карточка пока не открывает деталку — без hover-лифта и pointer.
-   Отступы щедрее, чем в каталоге, — плашка выходит почти квадратной. */
+/* Отступы щедрее, чем в каталоге, — плашка выходит почти квадратной. */
 .catalog-card.order-card {
-  cursor: default;
   gap: 14px;
   padding: 14px 16px 12px;
-}
-
-.catalog-card.order-card:hover:not(:disabled) {
-  transform: none;
 }
 
 .order-card-number {
@@ -1219,10 +1220,286 @@ select.info-input {
   color: var(--pink-700);
 }
 
-@media (max-width: 420px) {
-  .orders-grid {
-    grid-template-columns: 1fr;
-  }
+/* ——— Order Details ——— */
+
+.order-detail-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+}
+
+.order-detail .catalog-header {
+  gap: 10px;
+}
+
+/* Кнопка «← Orders» над заголовком, как на макете. */
+.order-detail .catalog-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.order-detail-title {
+  font-size: 1.05rem;
+}
+
+.order-detail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 2px 2px 8px;
+}
+
+/* Белая панель с розовой рамкой — как плашки на макете. */
+.order-detail-panel {
+  border-radius: 14px;
+  border: 2px solid var(--pink-200);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 14px 16px;
+  flex-shrink: 0;
+}
+
+.order-detail-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.order-detail-summary-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.order-detail-number {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-detail-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.order-detail-date {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.order-detail-summary-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.order-detail-total-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.order-detail-total-price {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--pink-700);
+  white-space: nowrap;
+}
+
+.order-detail-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.order-detail-section-title svg {
+  color: var(--pink-600);
+}
+
+/* Статус-бейдж и чипы посылок: цвет по статусу. */
+.order-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: var(--tone-bg);
+  border: 1px solid var(--tone-border);
+  color: var(--tone-ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.tone-green {
+  --tone-bg: #e9f8ee;
+  --tone-border: #a9dfb9;
+  --tone-ink: #2e8f4e;
+}
+
+.tone-blue {
+  --tone-bg: #e7f1ff;
+  --tone-border: #aecdf5;
+  --tone-ink: #3273c9;
+}
+
+.tone-orange {
+  --tone-bg: #fff3e2;
+  --tone-border: #f5cf9d;
+  --tone-ink: #d9821f;
+}
+
+.tone-grey {
+  --tone-bg: #f2eef1;
+  --tone-border: #d8ccd4;
+  --tone-ink: #837580;
+}
+
+.order-detail-packages {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.order-package-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--tone-bg);
+  border: 2px solid var(--tone-border);
+  color: var(--tone-ink);
+}
+
+.order-package-chip > svg {
+  flex-shrink: 0;
+}
+
+.order-package-chip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.order-package-chip-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-package-chip-status {
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-detail-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.order-item-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--pink-200);
+  min-width: 0;
+}
+
+.order-item-thumb {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--pink-50);
+  border: 1px solid var(--pink-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.order-item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.order-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.order-item-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.order-item-bottom {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.order-item-qty {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.order-item-price {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--pink-700);
+  white-space: nowrap;
+}
+
+.order-item-price.gift {
+  color: #2e8f4e;
 }
 
 .preview-mascot {

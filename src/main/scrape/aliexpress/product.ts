@@ -1,5 +1,6 @@
 import type { Page } from 'playwright'
 import { ensureAliExpressLoggedIn } from '../../browser/auth/aliexpress'
+import { gotoAliExpressPage } from './nav'
 import { normalizeDisplayPrice } from '../price'
 import type { ScrapedChoiceDraft, ScrapedProduct } from '../product'
 import { isAliProductUnavailable } from './availability'
@@ -19,7 +20,7 @@ export async function scrapeAliExpressProductPage(
   page: Page,
   opts: { url: string; productId: string }
 ): Promise<ScrapedProduct> {
-  await page.goto(opts.url, { waitUntil: 'domcontentloaded', timeout: 90_000 })
+  await gotoAliExpressPage(page, opts.url)
   await sleep(1500)
 
   await ensureAliExpressLoggedIn(page)

@@ -6,6 +6,10 @@ export type {
 } from './humanGate'
 
 export type {
+  OrderDetail,
+  OrderDetailItem,
+  OrderDetailPackage,
+  OrderGetResult,
   OrderListItem,
   OrderListQuery,
   OrderListResult,
