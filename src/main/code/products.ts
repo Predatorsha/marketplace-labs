@@ -602,12 +602,12 @@ export async function upsertProductFromSaved(
       import_source: opts.import_source,
       data_source: opts.data_source ?? null
     })
-    // Синтетический одиночный вариант-заглушка (цена «—», без фото) не должен
-    // затирать реальные варианты: у sold-out снапшота нет буй-бокса, и без
-    // хинта заказа цену взять неоткуда — прежние строки ценнее заглушки.
-    const placeholderOnly =
-      choices.length === 1 && choices[0].price.trim() === '—' && !choices[0].rel_path
-    if (!placeholderOnly || !getProductChoices(db, id).length) {
+    // У sold-out снапшота нет буй-бокса: его единственный вариант синтетический,
+    // даже если цена пришла из orderHint. Не заменяем им реальные варианты уже
+    // скачанной карточки; для новой карточки этот вариант всё равно сохраняется.
+    const syntheticSnapshotChoice =
+      opts.data_source === 'snapshot' && choices.length === 1 && !choices[0].rel_path
+    if (!syntheticSnapshotChoice || !getProductChoices(db, id).length) {
       setProductChoices(db, id, choices)
     }
     // Replace children only when the scrape produced rows. Empty arrays mean
