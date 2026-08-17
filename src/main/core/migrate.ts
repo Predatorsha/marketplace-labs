@@ -14,7 +14,8 @@ function ensureColumn(db: CatalogDb, table: string, column: string, ddl: string)
  * SCHEMA_SQL создаёт таблицы только целиком (IF NOT EXISTS): в уже существующую
  * таблицу новые колонки он не доливает. Каждое добавление колонки в SCHEMA_SQL
  * дублируется здесь ensureColumn'ом — тогда старые базы догоняют схему без
- * сноса файла.
+ * сноса файла. Ограничение SQLite: ADD COLUMN с NOT NULL требует DEFAULT —
+ * новые колонки объявляем nullable (или с дефолтом) в обоих местах.
  */
 export function migrateCatalogSchema(db: CatalogDb, _cfg: AppConfig): void {
   // 2026-08-17: источник импорта карточки + источник данных (PR #2).

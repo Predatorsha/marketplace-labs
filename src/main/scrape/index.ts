@@ -1,10 +1,11 @@
 import type { Page } from 'playwright'
 import type { AppConfig } from '../config'
 import { browserManager } from '../browser/manager'
-import { latestOrderItemForProduct } from '../code/orders'
+import { latestOrderItemForProduct, productHasFolder } from '../code/orders'
 import { applyProductMarketplaceStatus, upsertProductFromSaved } from '../code/products'
 import { connect } from '../core/connect'
 import { jobLog } from '../jobs/log'
+import { formatLinePrice } from '../orders/format'
 import { saveScrapedProductToDisk } from '../products/files'
 import { findProductRow } from '../products/load'
 import type {
@@ -124,6 +125,37 @@ export async function downloadProductWithPage(
       }
     }
 
+    // Мёртвый листинг у товара, который уже скачан: фолбэк-карточка из данных
+    // заказа затёрла бы живые варианты/тайтл (setProductChoices заменяет строки
+    // целиком) — только флип статуса. Паритет с синком заказов, где такие
+    // товары отсекает productHasFolder; голые строки без папки по-прежнему
+    // получают фолбэк-карточку ниже.
+    if (scraped.dead_listing && productHasFolder(cfg, parsed.platform, scraped.product_id)) {
+      const applied = applyProductMarketplaceStatus(cfg, {
+        platform: parsed.platform,
+        marketplace_product_id: scraped.product_id,
+        status: 'archived',
+        url: scraped.url ?? parsed.url
+      })
+      if (!applied.ok) {
+        return { ok: false, error: applied.error }
+      }
+      jobLog(
+        `scrape dead listing, existing card kept platform=${parsed.platform}` +
+          ` product_id=${scraped.product_id}`
+      )
+      return {
+        ok: true,
+        platform: parsed.platform,
+        product_id: scraped.product_id,
+        folder: applied.folder ?? undefined,
+        title: applied.title,
+        url: applied.url,
+        status: applied.status,
+        dead_listing: true
+      }
+    }
+
     // Fields + gallery already scraped; download photos to disk.
     const saved = await saveScrapedProductToDisk(cfg, {
       platform: parsed.platform,
@@ -153,7 +185,8 @@ export async function downloadProductWithPage(
         status: scraped.status ?? 'active'
       },
       folder: saved.folder,
-      import_source: opts.importSource
+      import_source: opts.importSource,
+      data_source: scraped.data_source ?? null
     })
 
     const choices = saved.product.local_files?.choices ?? []
@@ -193,14 +226,17 @@ export async function downloadProductWithPage(
 /**
  * Перекачка уже существующей карточки: тот же каскад скрейпа по сохранённому
  * URL. Хинт для фолбэка мёртвых листингов восстанавливается из последней
- * позиции заказа с этим товаром (картинка позиции в БД не хранится — при
- * пустом скачивании прежние фото переносит вперёд saveScrapedProductToDisk).
+ * позиции заказа с этим товаром (картинка позиции в БД не хранится; галерею
+ * карточки пустой скрейп не перезатирает — см. guard в upsertProductFromSaved).
+ * import_source строки форвардится как есть — заодно дозаполняет NULL у баз,
+ * мигрировавших со старой схемы.
  */
 export async function reimportProduct(
   cfg: AppConfig,
   key: ProductKey
 ): Promise<ProductDownloadResult> {
   let url: string | null = null
+  let importSource: ProductImportSource = 'link'
   let orderHint: OrderItemHint | undefined
   const db = connect(cfg)
   try {
@@ -212,17 +248,17 @@ export async function reimportProduct(
     if (!url) {
       return { ok: false, error: 'Product has no stored URL to re-import from' }
     }
+    if (row.import_source === 'orders') importSource = 'orders'
     const item = latestOrderItemForProduct(db, row.id)
     if (item) {
       orderHint = {
         title: item.title,
         variant: item.sku,
-        price:
-          item.unit_price != null
-            ? item.currency
-              ? `${item.currency} ${item.unit_price}`
-              : String(item.unit_price)
-            : null,
+        price: formatLinePrice({
+          quantity: 1,
+          unit_price: item.unit_price,
+          currency: item.currency
+        }),
         image: null
       }
     }
@@ -230,5 +266,5 @@ export async function reimportProduct(
     db.close()
   }
 
-  return scrapeProduct(cfg, url, { importSource: 'link', orderHint })
+  return scrapeProduct(cfg, url, { importSource, orderHint })
 }

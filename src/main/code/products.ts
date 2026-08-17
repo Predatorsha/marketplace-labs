@@ -219,10 +219,15 @@ export function upsertProductRecord(
     video?: string | null
     overwrite_purpose?: boolean
     status?: string | null
-    /** Триггер, создавший карточку. Пишется только при INSERT, апдейтом не меняется. */
+    /**
+     * Триггер, создавший карточку. Установленное значение апдейтом не меняется;
+     * NULL (домиграционные строки) дозаполняется через COALESCE.
+     */
     import_source?: ProductImportSource | null
     /** Источник данных карточки; null/undefined в апдейте сохраняет прежнее значение. */
     data_source?: ProductDataSource | null
+    /** data_source только для INSERT: существующим строкам значение не навязывает. */
+    data_source_if_new?: ProductDataSource | null
   }
 ): number {
   const platform = (opts.platform || '').trim().toLowerCase()
@@ -277,6 +282,7 @@ export function upsertProductRecord(
            store_url = COALESCE(?, store_url),
            video = COALESCE(?, video),
            status = COALESCE(?, status),
+           import_source = COALESCE(import_source, ?),
            data_source = COALESCE(?, data_source),
            last_seen_at = ?,
            updated_at = ?
@@ -296,6 +302,7 @@ export function upsertProductRecord(
       normalizeTextField(opts.store_url),
       normalizeTextField(opts.video),
       nextStatus,
+      opts.import_source ?? null,
       opts.data_source ?? null,
       now,
       now,
@@ -332,9 +339,7 @@ export function upsertProductRecord(
       normalizeTextField(opts.video),
       insertStatus,
       opts.import_source ?? null,
-      // Единственный вставщик без явного data_source — голые строки из позиций
-      // заказа (upsertOrderItem): их карточка и правда собрана из данных заказа.
-      opts.data_source ?? 'order_data',
+      opts.data_source ?? opts.data_source_if_new ?? null,
       now,
       now,
       now
@@ -500,6 +505,7 @@ export async function upsertProductFromSaved(
     product: Record<string, unknown>
     folder: string
     import_source: ProductImportSource
+    data_source?: ProductDataSource | null
     purpose?: string | null
     tags?: string[] | null
     choices?: ProductChoiceRow[] | null
@@ -594,14 +600,16 @@ export async function upsertProductFromSaved(
             ? 'active'
             : null,
       import_source: opts.import_source,
-      data_source:
-        opts.product.data_source === 'live' ||
-        opts.product.data_source === 'snapshot' ||
-        opts.product.data_source === 'order_data'
-          ? opts.product.data_source
-          : null
+      data_source: opts.data_source ?? null
     })
-    setProductChoices(db, id, choices)
+    // Синтетический одиночный вариант-заглушка (цена «—», без фото) не должен
+    // затирать реальные варианты: у sold-out снапшота нет буй-бокса, и без
+    // хинта заказа цену взять неоткуда — прежние строки ценнее заглушки.
+    const placeholderOnly =
+      choices.length === 1 && choices[0].price.trim() === '—' && !choices[0].rel_path
+    if (!placeholderOnly || !getProductChoices(db, id).length) {
+      setProductChoices(db, id, choices)
+    }
     // Replace children only when the scrape produced rows. Empty arrays mean
     // "not found this run" (details collapsed, image download fails) — keep
     // the previous catalog data instead of DELETE-wiping it.

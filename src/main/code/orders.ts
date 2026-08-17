@@ -1,6 +1,7 @@
 import type { AppConfig } from '../config'
 import { connect, utcNowIso, type CatalogDb } from '../core/connect'
 import type { OrderItemPayload, OrderPayload, PackagePayload } from '../db/models/order'
+import { formatLinePrice } from '../orders/format'
 import { ensureProductHasChoice, upsertProductRecord } from './products'
 
 export type { OrderItemPayload, OrderPayload, PackagePayload }
@@ -311,25 +312,22 @@ function upsertOrderItem(
 
   let productId: number | null = null
   if (mpid) {
-    // data_source не передаём: у уже скачанных карточек COALESCE сохранит
-    // прежнее значение, у голых строк сработает INSERT-дефолт 'order_data'.
+    // Голая строка из позиции заказа собрана из данных заказа (order_data);
+    // уже скачанным карточкам insert-only параметр значение не навязывает.
     productId = upsertProductRecord(db, cfg, {
       platform: orderPlat,
       marketplace_product_id: mpid,
       title: opts.title,
       url: opts.product_url,
-      import_source: 'orders'
+      import_source: 'orders',
+      data_source_if_new: 'order_data'
     })
     // Карточке товара нулевую «подарочную» цену не подсказываем.
     const priceHint = isGift
       ? null
       : opts.price != null
         ? opts.price
-        : unitPrice != null
-          ? currency
-            ? `${currency} ${unitPrice}`
-            : String(unitPrice)
-          : null
+        : formatLinePrice({ quantity: 1, unit_price: unitPrice, currency })
     ensureProductHasChoice(db, productId, priceHint)
   }
 

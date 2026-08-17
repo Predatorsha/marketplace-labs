@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ProductChoiceItem, ProductDownloadResult, ProductEditableFields } from '../../../shared/types'
+import type {
+  ProductChoiceItem,
+  ProductDataSource,
+  ProductDownloadResult,
+  ProductEditableFields,
+  ProductImportSource
+} from '../../../shared/types'
 import ProductDetailPanels, {
   type ProductDetailsData
 } from '../components/ProductDetailPanels'
@@ -34,6 +40,8 @@ export default function ImportPage({
   const [rating, setRating] = useState<string | null>(null)
   const [reviewCount, setReviewCount] = useState<string | null>(null)
   const [archivedPhotoSets, setArchivedPhotoSets] = useState(0)
+  const [importSource, setImportSource] = useState<ProductImportSource | null>(null)
+  const [dataSource, setDataSource] = useState<ProductDataSource | null>(null)
 
   useEffect(() => {
     if (!lastDownload?.ok || !lastDownload.platform || !lastDownload.product_id) {
@@ -43,6 +51,8 @@ export default function ImportPage({
       setRating(null)
       setReviewCount(null)
       setArchivedPhotoSets(0)
+      setImportSource(null)
+      setDataSource(null)
       return
     }
     let cancelled = false
@@ -60,6 +70,8 @@ export default function ImportPage({
           setRating(res.product.rating)
           setReviewCount(res.product.review_count)
           setArchivedPhotoSets(res.product.archived_photo_sets ?? 0)
+          setImportSource(res.product.import_source ?? null)
+          setDataSource(res.product.data_source ?? null)
         } else {
           setImageUrls([])
           setChoices([])
@@ -67,6 +79,8 @@ export default function ImportPage({
           setRating(null)
           setReviewCount(null)
           setArchivedPhotoSets(0)
+          setImportSource(null)
+          setDataSource(null)
         }
       })
       .catch(() => {
@@ -77,6 +91,8 @@ export default function ImportPage({
           setRating(null)
           setReviewCount(null)
           setArchivedPhotoSets(0)
+          setImportSource(null)
+          setDataSource(null)
         }
       })
     return () => {
@@ -99,11 +115,23 @@ export default function ImportPage({
       review_count: reviewCount,
       tags: Array.isArray(lastDownload.tags) ? lastDownload.tags : [],
       status: lastDownload.status || 'active',
+      import_source: importSource,
+      data_source: dataSource,
       image_urls: imageUrls,
       choices,
       archived_photo_sets: archivedPhotoSets
     }
-  }, [lastDownload, imageUrls, choices, price, rating, reviewCount, archivedPhotoSets])
+  }, [
+    lastDownload,
+    imageUrls,
+    choices,
+    price,
+    rating,
+    reviewCount,
+    archivedPhotoSets,
+    importSource,
+    dataSource
+  ])
 
   return (
     <div className="import-page">
