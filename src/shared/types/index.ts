@@ -19,6 +19,16 @@ export type {
 } from './orders'
 
 export type {
+  PackageDetail,
+  PackageDetailItem,
+  PackageGetResult,
+  PackageListItem,
+  PackageListResult,
+  PackageOrderRef,
+  PackageStatusKey
+} from './packages'
+
+export type {
   ProductDownloadResult,
   ProductStatus,
   ProductImportSource,

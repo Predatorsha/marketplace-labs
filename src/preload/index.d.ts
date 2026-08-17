@@ -4,6 +4,8 @@ import type {
   OrderListQuery,
   OrderListResult,
   OrderStartResult,
+  PackageGetResult,
+  PackageListResult,
   PlatformId,
   ProductDownloadResult,
   ProductEditableFields,
@@ -18,6 +20,8 @@ export type DesktopApi = {
   startOrderSync: (platform: PlatformId) => Promise<OrderStartResult>
   listOrders: (query?: OrderListQuery) => Promise<OrderListResult>
   getOrder: (id: number) => Promise<OrderGetResult>
+  listPackages: () => Promise<PackageListResult>
+  getPackage: (id: number) => Promise<PackageGetResult>
   continueHumanGate: (gateId: number) => Promise<boolean>
   cancelHumanGate: (gateId: number) => Promise<boolean>
   onHumanGate: (cb: (payload: HumanGateEvent) => void) => () => void
