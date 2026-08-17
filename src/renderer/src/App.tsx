@@ -9,6 +9,7 @@ import Sidebar, { type NavId } from './components/Sidebar'
 import ImportPage from './pages/ImportPage'
 import CatalogPage from './pages/CatalogPage'
 import OrdersPage from './pages/OrdersPage'
+import PackagesPage from './pages/PackagesPage'
 
 export default function App(): React.JSX.Element {
   const [nav, setNav] = useState<NavId>('import')
@@ -159,7 +160,7 @@ export default function App(): React.JSX.Element {
   }
 
   function onNavigate(id: NavId): void {
-    if (id === 'import' || id === 'catalog' || id === 'orders') {
+    if (id === 'import' || id === 'catalog' || id === 'orders' || id === 'packages') {
       setNav(id)
       setStatus('')
       return
@@ -196,6 +197,14 @@ export default function App(): React.JSX.Element {
         ) : null}
         {nav === 'orders' ? (
           <OrdersPage
+            onStatus={(message, kind = 'ok') => {
+              setStatus(message)
+              setStatusKind(kind)
+            }}
+          />
+        ) : null}
+        {nav === 'packages' ? (
+          <PackagesPage
             onStatus={(message, kind = 'ok') => {
               setStatus(message)
               setStatusKind(kind)

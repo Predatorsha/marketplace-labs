@@ -5,6 +5,8 @@ import type {
   OrderListQuery,
   OrderListResult,
   OrderStartResult,
+  PackageGetResult,
+  PackageListResult,
   PlatformId,
   ProductDownloadResult,
   ProductEditableFields,
@@ -23,6 +25,11 @@ const api = {
     ipcRenderer.invoke('orders:list', query || {}),
 
   getOrder: (id: number): Promise<OrderGetResult> => ipcRenderer.invoke('orders:get', { id }),
+
+  listPackages: (): Promise<PackageListResult> => ipcRenderer.invoke('packages:list'),
+
+  getPackage: (id: number): Promise<PackageGetResult> =>
+    ipcRenderer.invoke('packages:get', { id }),
 
   continueHumanGate: (gateId: number): Promise<boolean> =>
     ipcRenderer.invoke('orders:humanGateContinue', { gateId }),
