@@ -21,6 +21,8 @@ export type {
 export type {
   ProductDownloadResult,
   ProductStatus,
+  ProductImportSource,
+  ProductDataSource,
   ProductEditableFields,
   ProductKey,
   ProductChoiceItem,

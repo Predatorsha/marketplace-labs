@@ -19,6 +19,15 @@ export type ProductDownloadResult = {
 
 export type ProductStatus = 'active' | 'archived'
 
+/** Триггер, создавший карточку: ручной импорт по ссылке или синк заказов. */
+export type ProductImportSource = 'link' | 'orders'
+
+/**
+ * Откуда собраны данные карточки: живая PDP, страница-снапшот sold-out
+ * товара или фолбэк из данных позиции заказа. Перезаписывается каждым скрейпом.
+ */
+export type ProductDataSource = 'live' | 'snapshot' | 'order_data'
+
 export type ProductEditableFields = {
   title?: string | null
   url?: string | null
@@ -68,6 +77,8 @@ export type ProductCard = {
   /** Derived join of choice prices for display (e.g. `€2.68; €2.65`). */
   price: string | null
   status: string
+  import_source: ProductImportSource | null
+  data_source: ProductDataSource | null
   description: string | null
   tags: string[]
   /** Local gallery image URLs (`ml-media://…`) for preview. */

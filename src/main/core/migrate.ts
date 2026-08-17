@@ -1,13 +1,24 @@
 import type { AppConfig } from '../config'
 import type { CatalogDb } from './connect'
 
+/** Идемпотентная доливка колонки: SQLite не умеет ADD COLUMN IF NOT EXISTS. */
+function ensureColumn(db: CatalogDb, table: string, column: string, ddl: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  if (cols.some((c) => c.name === column)) return
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`)
+}
+
 /**
  * Миграции каталога поверх SCHEMA_SQL (schema.ts — единый инит).
  *
- * Сейчас миграций нет: данные тестовые, изменение схемы = правка SCHEMA_SQL
- * + снос data/catalog.sqlite. Когда появятся боевые данные, ALTER'ы старых БД
- * добавляются сюда (свёрнутые в инит 2026-08-11 доливки колонок удалены).
+ * SCHEMA_SQL создаёт таблицы только целиком (IF NOT EXISTS): в уже существующую
+ * таблицу новые колонки он не доливает. Каждое добавление колонки в SCHEMA_SQL
+ * дублируется здесь ensureColumn'ом — тогда старые базы догоняют схему без
+ * сноса файла. Ограничение SQLite: ADD COLUMN с NOT NULL требует DEFAULT —
+ * новые колонки объявляем nullable (или с дефолтом) в обоих местах.
  */
-export function migrateCatalogSchema(_db: CatalogDb, _cfg: AppConfig): void {
-  /* нет миграций */
+export function migrateCatalogSchema(db: CatalogDb, _cfg: AppConfig): void {
+  // 2026-08-17: источник импорта карточки + источник данных (PR #2).
+  ensureColumn(db, 'products', 'import_source', 'import_source TEXT')
+  ensureColumn(db, 'products', 'data_source', 'data_source TEXT')
 }

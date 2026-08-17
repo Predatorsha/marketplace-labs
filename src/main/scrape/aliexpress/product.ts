@@ -92,6 +92,7 @@ export async function scrapeAliExpressProductPage(
     title,
     description: title,
     status: 'active',
+    data_source: 'live',
     rating: dom.rating,
     review_count: dom.reviewCount,
     orders: dom.sold,

@@ -168,6 +168,7 @@ export async function scrapeTemuProductPage(
     title: text,
     description: text,
     status: 'active',
+    data_source: 'live',
     rating: dom.rating,
     review_count: dom.reviewCount,
     seller_name: dom.sellerName,

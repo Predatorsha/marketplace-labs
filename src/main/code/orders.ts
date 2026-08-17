@@ -1,6 +1,7 @@
 import type { AppConfig } from '../config'
 import { connect, utcNowIso, type CatalogDb } from '../core/connect'
 import type { OrderItemPayload, OrderPayload, PackagePayload } from '../db/models/order'
+import { formatLinePrice } from '../orders/format'
 import { ensureProductHasChoice, upsertProductRecord } from './products'
 
 export type { OrderItemPayload, OrderPayload, PackagePayload }
@@ -133,6 +134,29 @@ export function productHasFolder(
   } finally {
     db.close()
   }
+}
+
+/**
+ * Последняя позиция заказа с этим товаром — источник хинта для перекачки
+ * (тайтл/вариант/цена мёртвого листинга). Подарочные позиции пропускаем:
+ * их unit_price принудительно 0 и товару не принадлежит.
+ */
+export function latestOrderItemForProduct(
+  db: CatalogDb,
+  productId: number
+): { title: string | null; sku: string | null; unit_price: number | null; currency: string | null } | null {
+  const row = db
+    .prepare(
+      `SELECT oi.title, oi.sku, oi.unit_price, oi.currency
+         FROM order_items oi JOIN orders o ON o.id = oi.order_id
+        WHERE oi.product_id = ? AND oi.is_gift = 0
+        ORDER BY o.ordered_at DESC, oi.id DESC
+        LIMIT 1`
+    )
+    .get(productId) as
+    | { title: string | null; sku: string | null; unit_price: number | null; currency: string | null }
+    | undefined
+  return row ?? null
 }
 
 /**
@@ -288,22 +312,22 @@ function upsertOrderItem(
 
   let productId: number | null = null
   if (mpid) {
+    // Голая строка из позиции заказа собрана из данных заказа (order_data);
+    // уже скачанным карточкам insert-only параметр значение не навязывает.
     productId = upsertProductRecord(db, cfg, {
       platform: orderPlat,
       marketplace_product_id: mpid,
       title: opts.title,
-      url: opts.product_url
+      url: opts.product_url,
+      import_source: 'orders',
+      data_source_if_new: 'order_data'
     })
     // Карточке товара нулевую «подарочную» цену не подсказываем.
     const priceHint = isGift
       ? null
       : opts.price != null
         ? opts.price
-        : unitPrice != null
-          ? currency
-            ? `${currency} ${unitPrice}`
-            : String(unitPrice)
-          : null
+        : formatLinePrice({ quantity: 1, unit_price: unitPrice, currency })
     ensureProductHasChoice(db, productId, priceHint)
   }
 

@@ -483,6 +483,18 @@ select.info-input {
   padding-top: 4px;
 }
 
+/* Результат перекачки под кнопками деталки (в духе .orders-note). */
+.panel-note {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.panel-note.error {
+  color: #c0392b;
+}
+
 .btn-ghost {
   appearance: none;
   flex: 1;

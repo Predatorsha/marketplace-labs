@@ -228,6 +228,7 @@ export async function syncOrders(
               variant: item.sku ?? null
             }
             const res = await downloadProductWithPage(cfg, page, parsed, {
+              importSource: 'orders',
               orderHint: hint
             })
             if (res.ok) {

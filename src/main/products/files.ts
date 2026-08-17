@@ -247,10 +247,15 @@ export async function saveScrapedProductToDisk(
       }
     } else if (prevActive) {
       // Keep prior choice photos on the new active stamp (paired by sort order).
+      // Пары по индексу честны только при равном числе вариантов: усечённый
+      // список (например, синтетический вариант мёртвого листинга) получил бы
+      // фото чужого варианта.
       const copied = copyDirFiles(join(prevActive, 'choices'), choicesDir)
-      copied.forEach((n, i) => {
-        if (i < choiceRels.length) choiceRels[i] = `choices/${n}`
-      })
+      if (copied.length === choiceRels.length) {
+        copied.forEach((n, i) => {
+          choiceRels[i] = `choices/${n}`
+        })
+      }
     }
 
     if (videoDownload) {
@@ -267,9 +272,13 @@ export async function saveScrapedProductToDisk(
     // No files downloaded — do not create a snapshot; keep prior choice paths for price upsert.
     const prevActive = resolveActiveSnapshot(rootAbs)
     if (prevActive) {
-      listFiles(join(prevActive, 'choices')).forEach((n, i) => {
-        if (i < choiceRels.length) choiceRels[i] = `choices/${n}`
-      })
+      // Пары по индексу — только при равном числе вариантов (см. выше).
+      const prevChoices = listFiles(join(prevActive, 'choices'))
+      if (prevChoices.length === choiceRels.length) {
+        prevChoices.forEach((n, i) => {
+          choiceRels[i] = `choices/${n}`
+        })
+      }
       const prevVideo = listFiles(join(prevActive, 'video'))
       if (prevVideo.length) videoRel = `video/${prevVideo[0]}`
     }

@@ -46,6 +46,8 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
   const [detailBusy, setDetailBusy] = useState(false)
   const onStatusRef = useRef(onStatus)
   onStatusRef.current = onStatus
+  const selectedRef = useRef(selected)
+  selectedRef.current = selected
 
   const fetchPage = useCallback(
     (nextPage: number, pageSize: number): Promise<ProductListResult> => {
@@ -117,6 +119,34 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
     }
   }
 
+  async function onReimport(): Promise<{ ok: boolean; error?: string }> {
+    if (!selected || !window.api?.reimportProduct) {
+      return { ok: false, error: 'Cannot re-import: product is not loaded.' }
+    }
+    const key = { platform: selected.platform, product_id: selected.product_id }
+    // Скрейп идёт минуты; detailBusy не держим, чтобы не блокировать каталог,
+    // а актуальность проверяем перед подменой selected: пользователь мог уйти
+    // со страницы или открыть другой товар.
+    const stillCurrent = (): boolean =>
+      selectedRef.current?.platform === key.platform &&
+      selectedRef.current?.product_id === key.product_id
+    try {
+      const res = await window.api.reimportProduct(key)
+      if (!res.ok) return { ok: false, error: res.error || 'Re-import failed.' }
+      const fresh = await window.api.getProduct(key)
+      if (!fresh.ok || !fresh.product) {
+        return {
+          ok: false,
+          error: `Re-import finished, but the card failed to reload: ${fresh.error || 'unknown error'}`
+        }
+      }
+      if (stillCurrent()) setSelected(fresh.product)
+      return { ok: true }
+    } catch (exc) {
+      return { ok: false, error: exc instanceof Error ? exc.message : String(exc) }
+    }
+  }
+
   function goBack(): void {
     setSelected(null)
     void loadPage(page)
@@ -139,6 +169,7 @@ export default function CatalogPage({ onStatus }: Props): React.JSX.Element {
           busy={detailBusy}
           onOpenFolder={() => void onOpenFolder()}
           onSaveDetails={onSaveDetails}
+          onReimport={onReimport}
         />
       </div>
     )

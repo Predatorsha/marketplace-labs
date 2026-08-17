@@ -56,6 +56,9 @@ const api = {
   downloadProduct: (url: string): Promise<ProductDownloadResult> =>
     ipcRenderer.invoke('products:download', { url }),
 
+  reimportProduct: (key: ProductKey): Promise<ProductDownloadResult> =>
+    ipcRenderer.invoke('products:reimport', key),
+
   listProducts: (query?: ProductListQuery): Promise<ProductListResult> =>
     ipcRenderer.invoke('products:list', query || {}),
 

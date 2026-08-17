@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
-import type { ProductChoiceItem, ProductEditableFields, ProductStatus } from '../../../shared/types'
+import type {
+  ProductChoiceItem,
+  ProductDataSource,
+  ProductEditableFields,
+  ProductImportSource,
+  ProductStatus
+} from '../../../shared/types'
 import PixelMascot from './PixelMascot'
 import StarRatingDisplay from './StarRatingDisplay'
 import { IconImage, IconHeart } from './icons'
@@ -17,6 +23,8 @@ export type ProductDetailsData = {
   review_count: string | null
   tags: string[]
   status: string | null
+  import_source?: ProductImportSource | null
+  data_source?: ProductDataSource | null
   image_urls: string[]
   choices?: ProductChoiceItem[]
   archived_photo_sets?: number
@@ -28,6 +36,8 @@ type Props = {
   busy?: boolean
   onOpenFolder: () => void
   onSaveDetails: (patch: ProductEditableFields) => Promise<boolean>
+  /** Перекачка карточки со страницы маркетплейса; без пропа кнопки нет. */
+  onReimport?: () => Promise<{ ok: boolean; error?: string }>
 }
 
 type Draft = {
@@ -46,6 +56,8 @@ const EMPTY_FIELDS = [
   'Pack quantity',
   'Price',
   'Status',
+  'Imported via',
+  'Data source',
   'Tags',
   'Folder path',
   'URL'
@@ -77,6 +89,10 @@ function fieldValue(label: FieldLabel, product: ProductDetailsData | null): stri
       return product.price || ''
     case 'Status':
       return product.status || 'active'
+    case 'Imported via':
+      return product.import_source || ''
+    case 'Data source':
+      return product.data_source ? product.data_source.replace('_', ' ') : ''
     case 'Tags':
       return Array.isArray(product.tags) && product.tags.length ? product.tags.join(', ') : ''
     case 'Folder path':
@@ -132,11 +148,14 @@ export default function ProductDetailPanels({
   emptyInfoText = 'Product details will appear here after import.',
   busy = false,
   onOpenFolder,
-  onSaveDetails
+  onSaveDetails,
+  onReimport
 }: Props): React.JSX.Element {
   const hasProduct = Boolean(product?.folder)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [reimporting, setReimporting] = useState(false)
+  const [note, setNote] = useState<{ text: string; kind: 'ok' | 'error' } | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [previewIndex, setPreviewIndex] = useState(0)
   const [choiceIndex, setChoiceIndex] = useState<number | null>(null)
@@ -147,6 +166,7 @@ export default function ProductDetailPanels({
   useEffect(() => {
     setEditing(false)
     setDraft(null)
+    setNote(null)
     setPreviewIndex(0)
     setChoiceIndex(null)
   }, [product?.folder, product?.product_id])
@@ -203,6 +223,27 @@ export default function ProductDetailPanels({
 
   function setDraftField<K extends keyof Draft>(key: K, value: Draft[K]): void {
     setDraft((prev) => (prev ? { ...prev, [key]: value } : prev))
+  }
+
+  async function runReimport(): Promise<void> {
+    if (!onReimport || reimporting) return
+    setNote(null)
+    setReimporting(true)
+    try {
+      const res = await onReimport()
+      if (res.ok) {
+        setNote({ text: 'Re-imported.', kind: 'ok' })
+      } else {
+        setNote({ text: res.error || 'Re-import failed.', kind: 'error' })
+      }
+    } catch (exc) {
+      setNote({
+        text: exc instanceof Error ? exc.message : String(exc),
+        kind: 'error'
+      })
+    } finally {
+      setReimporting(false)
+    }
   }
 
   const activeImage =
@@ -343,16 +384,32 @@ export default function ProductDetailPanels({
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                className="btn-ghost"
-                disabled={!hasProduct || busy}
-                onClick={startEdit}
-              >
-                Edit details
-              </button>
+              <>
+                {onReimport ? (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={!hasProduct || busy || reimporting}
+                    onClick={() => void runReimport()}
+                  >
+                    {reimporting ? 'Re-importing…' : 'Re-import'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={!hasProduct || busy || reimporting}
+                  onClick={startEdit}
+                >
+                  Edit details
+                </button>
+              </>
             )}
           </div>
+
+          {note ? (
+            <p className={`panel-note${note.kind === 'error' ? ' error' : ''}`}>{note.text}</p>
+          ) : null}
         </div>
       </section>
 
@@ -461,6 +518,8 @@ export function productCardToDetails(product: {
   review_count?: string | null
   tags: string[]
   status: string
+  import_source?: ProductImportSource | null
+  data_source?: ProductDataSource | null
   image_urls?: string[]
   choices?: ProductChoiceItem[]
   archived_photo_sets?: number
@@ -478,6 +537,8 @@ export function productCardToDetails(product: {
     review_count: product.review_count ?? null,
     tags: product.tags || [],
     status: product.status,
+    import_source: product.import_source ?? null,
+    data_source: product.data_source ?? null,
     image_urls: product.image_urls || [],
     choices: product.choices || [],
     archived_photo_sets: product.archived_photo_sets ?? 0
